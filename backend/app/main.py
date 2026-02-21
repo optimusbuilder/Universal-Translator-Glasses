@@ -8,8 +8,10 @@ from typing import AsyncIterator
 
 from fastapi import FastAPI
 
+from backend.app.ingest.manager import IngestManager
 from backend.app.logging_config import configure_logging
 from backend.app.routes.health import router as health_router
+from backend.app.routes.ingest import router as ingest_router
 from backend.app.settings import build_settings
 
 
@@ -30,6 +32,7 @@ def create_app() -> FastAPI:
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.settings = settings
         app.state.started_at = datetime.now(timezone.utc)
+        app.state.ingest_manager = IngestManager(settings=settings, logger=logger)
 
         logger.info(
             "service_startup",
@@ -48,7 +51,9 @@ def create_app() -> FastAPI:
                 "config": settings.redacted(),
             },
         )
+        await app.state.ingest_manager.start()
         yield
+        await app.state.ingest_manager.stop()
         logger.info(
             "service_shutdown",
             extra={
@@ -69,6 +74,7 @@ def create_app() -> FastAPI:
         return {"message": "Universal Translator Glasses backend is running."}
 
     app.include_router(health_router)
+    app.include_router(ingest_router)
     return app
 
 

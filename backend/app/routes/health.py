@@ -12,6 +12,8 @@ router = APIRouter(tags=["health"])
 def get_health(request: Request) -> dict[str, Any]:
     settings = request.app.state.settings
     started_at = request.app.state.started_at
+    ingest_manager = request.app.state.ingest_manager
+    ingest_snapshot = ingest_manager.snapshot()
     now = datetime.now(timezone.utc)
     uptime_seconds = max(0.0, (now - started_at).total_seconds())
 
@@ -25,6 +27,9 @@ def get_health(request: Request) -> dict[str, Any]:
         "checks": {
             "camera_source_configured": settings.camera_source_configured,
             "gemini_key_configured": settings.gemini_key_configured,
+            "ingest_enabled": ingest_snapshot["ingest_enabled"],
+            "ingest_running": ingest_snapshot["running"],
+            "ingest_connected": ingest_snapshot["connected"],
+            "ingest_healthy": ingest_snapshot["healthy"],
         },
     }
-

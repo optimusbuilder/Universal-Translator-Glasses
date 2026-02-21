@@ -1,0 +1,54 @@
+from __future__ import annotations
+
+import asyncio
+import logging
+import os
+import unittest
+
+from backend.app.ingest.manager import IngestManager
+from backend.app.settings import Settings
+
+
+class Phase2ASourceIngestTest(unittest.IsolatedAsyncioTestCase):
+    async def test_p2a_source_ingest_soak(self) -> None:
+        soak_seconds = float(os.getenv("PHASE2A_SOAK_DURATION_SECONDS", "8"))
+
+        settings = Settings(
+            service_name="utg-backend",
+            service_version="0.1.0-phase2a",
+            environment="test",
+            log_level="INFO",
+            host="127.0.0.1",
+            port=8000,
+            ingest_enabled=True,
+            camera_source_mode="simulated",
+            camera_source_url=None,
+            ingest_reconnect_backoff_seconds=0.25,
+            simulated_fps=12.0,
+            simulated_disconnect_after_seconds=1.5,
+            simulated_disconnect_duration_seconds=2.0,
+            gemini_api_key="test-key",
+        )
+
+        logger = logging.getLogger("utg.backend.test.phase2a")
+        manager = IngestManager(settings=settings, logger=logger)
+
+        await manager.start()
+        await asyncio.sleep(soak_seconds)
+        await manager.stop()
+
+        snapshot = manager.snapshot()
+
+        self.assertTrue(snapshot["ingest_enabled"])
+        self.assertGreater(snapshot["frames_received"], 0)
+        self.assertGreater(snapshot["effective_fps"], 0.0)
+        self.assertGreaterEqual(snapshot["reconnect_count"], 1)
+        self.assertGreaterEqual(snapshot["dropped_frames"], 1)
+        self.assertIsNotNone(snapshot["last_frame_at"])
+        self.assertFalse(snapshot["connected"])
+        self.assertFalse(snapshot["healthy"])
+
+
+if __name__ == "__main__":
+    unittest.main()
+

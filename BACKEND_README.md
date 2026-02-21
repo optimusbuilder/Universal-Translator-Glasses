@@ -360,7 +360,9 @@ Current state:
 
 1. Planning complete.
 2. Phase 1 implementation scaffold created.
-3. Phase 1 completion test execution pending dependency install in runtime environment.
-4. `Phase 2A` is the next build step until ESP32 hardware is connected.
+3. Phase 1 completion test passes (validated with shortened runtime configuration).
+4. Phase 2A ingest scaffold implemented with simulated source + reconnect manager.
+5. Phase 2A core soak test passes with simulated source.
+6. Phase 2A API-contract test passes.
 
 This document is intentionally implementation-first planning only and includes no backend code.
