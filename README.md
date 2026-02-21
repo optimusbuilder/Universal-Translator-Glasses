@@ -322,6 +322,14 @@ The detailed website/UX plan for the live translation reader is documented in:
 
 Use that file to drive frontend implementation before writing production UI code.
 
+## 18) Backend Delivery Source of Truth
+
+The backend phased execution plan and phase-completion tests are documented in:
+
+1. `BACKEND_README.md`
+
+Use that file to implement backend work phase by phase with objective completion checks.
+
 ---
 
 This README defines the software implementation strategy and execution plan for the ESP32S3 Sense-based build. Code implementation will follow this document phase by phase.

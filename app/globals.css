@@ -28,7 +28,7 @@ body {
 
 body {
   color: var(--text-main);
-  font-family: "Manrope", "Avenir Next", "Segoe UI Variable", "Helvetica Neue", sans-serif;
+  font-family: "Cormorant", "Georgia", "Times New Roman", serif;
   background: var(--bg-gradient);
   padding: 1.25rem;
 }
@@ -58,7 +58,7 @@ body {
 
 .titleBlock h1 {
   margin: 0.15rem 0 0;
-  font-family: "Sora", "Trebuchet MS", sans-serif;
+  font-family: "Cormorant", "Georgia", "Times New Roman", serif;
   font-size: clamp(1.35rem, 2vw, 2rem);
   line-height: 1.15;
 }
@@ -212,7 +212,7 @@ body {
 }
 
 .panelHeader h2 {
-  font-family: "Sora", "Trebuchet MS", sans-serif;
+  font-family: "Cormorant", "Georgia", "Times New Roman", serif;
   margin: 0;
   font-size: 1.05rem;
 }
@@ -229,7 +229,7 @@ body {
 
 .finalCaption {
   margin: 0;
-  font-family: "Sora", "Trebuchet MS", sans-serif;
+  font-family: "Cormorant", "Georgia", "Times New Roman", serif;
   line-height: 1.15;
   letter-spacing: 0.02em;
 }
@@ -348,8 +348,9 @@ body {
 }
 
 .monoLabel {
-  font-family: "IBM Plex Mono", "Menlo", monospace;
+  font-family: "Cormorant", "Georgia", "Times New Roman", serif;
   font-size: 0.75rem;
+  letter-spacing: 0.04em;
   color: var(--text-muted);
 }
 
@@ -436,7 +437,7 @@ body {
   margin: 0;
   font-size: 1.5rem;
   line-height: 1.2;
-  font-family: "Sora", "Trebuchet MS", sans-serif;
+  font-family: "Cormorant", "Georgia", "Times New Roman", serif;
 }
 
 .mobilePartial {
