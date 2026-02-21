@@ -54,9 +54,17 @@ class Settings:
     camera_source_mode: str
     camera_source_url: str | None
     ingest_reconnect_backoff_seconds: float
+    esp32_frame_path: str
+    esp32_request_timeout_seconds: float
+    esp32_poll_interval_seconds: float
     simulated_fps: float
     simulated_disconnect_after_seconds: float
     simulated_disconnect_duration_seconds: float
+    landmark_enabled: bool
+    landmark_mode: str
+    landmark_queue_maxsize: int
+    landmark_recent_results_limit: int
+    mock_landmark_detection_rate: float
     gemini_api_key: str | None
 
     @property
@@ -81,9 +89,17 @@ class Settings:
             "camera_source_mode": self.camera_source_mode,
             "camera_source_configured": self.camera_source_configured,
             "ingest_reconnect_backoff_seconds": self.ingest_reconnect_backoff_seconds,
+            "esp32_frame_path": self.esp32_frame_path,
+            "esp32_request_timeout_seconds": self.esp32_request_timeout_seconds,
+            "esp32_poll_interval_seconds": self.esp32_poll_interval_seconds,
             "simulated_fps": self.simulated_fps,
             "simulated_disconnect_after_seconds": self.simulated_disconnect_after_seconds,
             "simulated_disconnect_duration_seconds": self.simulated_disconnect_duration_seconds,
+            "landmark_enabled": self.landmark_enabled,
+            "landmark_mode": self.landmark_mode,
+            "landmark_queue_maxsize": self.landmark_queue_maxsize,
+            "landmark_recent_results_limit": self.landmark_recent_results_limit,
+            "mock_landmark_detection_rate": self.mock_landmark_detection_rate,
             "gemini_key_configured": self.gemini_key_configured,
         }
 
@@ -104,6 +120,13 @@ def build_settings(project_root: Path) -> Settings:
         ingest_reconnect_backoff_seconds=float(
             os.getenv("INGEST_RECONNECT_BACKOFF_SECONDS", "1.0")
         ),
+        esp32_frame_path=os.getenv("ESP32_FRAME_PATH", "/frame").strip() or "/frame",
+        esp32_request_timeout_seconds=float(
+            os.getenv("ESP32_REQUEST_TIMEOUT_SECONDS", "2.0")
+        ),
+        esp32_poll_interval_seconds=float(
+            os.getenv("ESP32_POLL_INTERVAL_SECONDS", "0.08")
+        ),
         simulated_fps=float(os.getenv("SIMULATED_SOURCE_FPS", "12.0")),
         simulated_disconnect_after_seconds=float(
             os.getenv("SIMULATED_DISCONNECT_AFTER_SECONDS", "-1.0")
@@ -111,5 +134,10 @@ def build_settings(project_root: Path) -> Settings:
         simulated_disconnect_duration_seconds=float(
             os.getenv("SIMULATED_DISCONNECT_DURATION_SECONDS", "10.0")
         ),
+        landmark_enabled=_env_bool("LANDMARK_ENABLED", True),
+        landmark_mode=os.getenv("LANDMARK_MODE", "mock").strip().lower(),
+        landmark_queue_maxsize=int(os.getenv("LANDMARK_QUEUE_MAXSIZE", "256")),
+        landmark_recent_results_limit=int(os.getenv("LANDMARK_RECENT_RESULTS_LIMIT", "50")),
+        mock_landmark_detection_rate=float(os.getenv("MOCK_LANDMARK_DETECTION_RATE", "0.85")),
         gemini_api_key=os.getenv("GEMINI_API_KEY"),
     )

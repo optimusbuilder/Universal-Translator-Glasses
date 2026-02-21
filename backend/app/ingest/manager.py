@@ -6,7 +6,7 @@ from collections import deque
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from time import monotonic
-from typing import Callable
+from typing import Awaitable, Callable
 
 from backend.app.ingest.sources.base import (
     CameraSource,
@@ -14,6 +14,7 @@ from backend.app.ingest.sources.base import (
     CameraSourceError,
     FramePacket,
 )
+from backend.app.ingest.sources.esp32_http import ESP32HttpCameraSource
 from backend.app.ingest.sources.simulated import SimulatedCameraSource
 from backend.app.settings import Settings
 
@@ -34,16 +35,27 @@ class IngestMetrics:
 
 
 class IngestManager:
-    def __init__(self, settings: Settings, logger: logging.Logger) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        logger: logging.Logger,
+        source_factory_override: Callable[[], CameraSource] | None = None,
+    ) -> None:
         self._settings = settings
         self._logger = logger
         self._metrics = IngestMetrics(source_mode=settings.camera_source_mode)
         self._fps_window_seconds = 5.0
         self._recent_frame_times: deque[float] = deque()
-        self._source_factory = self._build_source_factory(settings)
+        self._source_factory = source_factory_override or self._build_source_factory(settings)
         self._task: asyncio.Task[None] | None = None
         self._stopping = False
         self._lock = asyncio.Lock()
+        self._frame_handlers: list[Callable[[FramePacket], Awaitable[None]]] = []
+
+    def register_frame_handler(
+        self, handler: Callable[[FramePacket], Awaitable[None]]
+    ) -> None:
+        self._frame_handlers.append(handler)
 
     async def start(self) -> None:
         if not self._settings.ingest_enabled:
@@ -99,8 +111,21 @@ class IngestManager:
             )
             return lambda: source
 
+        if settings.camera_source_mode == "esp32_http":
+            if not settings.camera_source_url:
+                raise ValueError(
+                    "camera_source_url is required for CAMERA_SOURCE_MODE=esp32_http"
+                )
+
+            return lambda: ESP32HttpCameraSource(
+                base_url=settings.camera_source_url or "",
+                frame_path=settings.esp32_frame_path,
+                request_timeout_seconds=settings.esp32_request_timeout_seconds,
+                poll_interval_seconds=settings.esp32_poll_interval_seconds,
+            )
+
         raise ValueError(
-            "unsupported camera source mode. Expected 'simulated' for Phase 2A."
+            "unsupported camera source mode. Expected 'simulated' or 'esp32_http'."
         )
 
     async def _run(self) -> None:
@@ -169,6 +194,15 @@ class IngestManager:
             self._metrics.connected = True
             self._metrics.healthy = True
             self._metrics.last_error = None
+
+        for handler in self._frame_handlers:
+            try:
+                await handler(frame)
+            except Exception as exc:  # pragma: no cover - safety net
+                await self._record_error(
+                    f"frame_handler_error:{type(exc).__name__}:{exc}",
+                    dropped_frame=False,
+                )
 
     async def _record_disconnect(self, reason: str, dropped_frame: bool) -> None:
         async with self._lock:

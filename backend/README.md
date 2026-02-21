@@ -1,14 +1,18 @@
-# Backend Setup (Phase 1 + Phase 2A)
+# Backend Setup (Phase 1 + Phase 2A + Phase 2B Dry-Run + Phase 3)
 
 This backend currently implements:
 
 1. Phase 1: service skeleton, lifecycle hooks, structured logging, `/health`.
 2. Phase 2A: source-agnostic ingest manager with simulated camera source, reconnect logic, and ingest metrics.
+3. Phase 2B dry-run: ESP32 HTTP adapter with mock-driven validation (no hardware required).
+4. Phase 3: landmark extraction pipeline with queueing, mock extractor, and status endpoints.
 
 ## Implemented Endpoints
 
 1. `GET /health`: service health + ingest health summary.
 2. `GET /ingest/status`: ingest metrics snapshot.
+3. `GET /landmarks/status`: landmark pipeline metrics snapshot.
+4. `GET /landmarks/recent?limit=<n>`: recent landmark extraction payloads.
 
 ## Backend Files
 
@@ -20,12 +24,23 @@ This backend currently implements:
 6. `backend/app/ingest/manager.py`: reconnecting ingest loop and metrics.
 7. `backend/app/ingest/sources/base.py`: source contract.
 8. `backend/app/ingest/sources/simulated.py`: synthetic source for pre-hardware testing.
+9. `backend/app/ingest/sources/esp32_http.py`: ESP32 HTTP source adapter.
+10. `backend/mock/esp32_mock_app.py`: optional FastAPI mock ESP32 frame server.
+11. `backend/app/landmarks/pipeline.py`: frame-to-landmark processing pipeline.
+12. `backend/app/landmarks/types.py`: landmark result schema.
+13. `backend/app/landmarks/extractors/mock.py`: deterministic mock hand landmark extractor.
+14. `backend/app/landmarks/extractors/mediapipe.py`: mediapipe-mode placeholder extractor.
+15. `backend/app/routes/landmarks.py`: landmark status/result endpoints.
 
 ## Tests
 
 1. `backend/tests/test_phase1_boot.py`: Phase 1 completion test.
 2. `backend/tests/test_phase2a_source_ingest.py`: Phase 2A soak/reconnect test.
 3. `backend/tests/test_phase2a_ingest_api.py`: ingest API contract test.
+4. `backend/tests/test_phase2b_esp32_source_mock.py`: ESP32 source adapter contract test.
+5. `backend/tests/test_phase2b_ingest_dry_run.py`: Phase 2B dry-run soak test (mock transport).
+6. `backend/tests/test_phase3_landmark_quality.py`: Phase 3 landmark quality test.
+7. `backend/tests/test_phase3_landmark_api.py`: Phase 3 API contract test.
 
 ## Install
 
@@ -74,17 +89,69 @@ PHASE2A_SOAK_DURATION_SECONDS=12 PYTHONPATH=. .venv/bin/python -m unittest backe
 PYTHONPATH=. .venv/bin/python -m unittest backend.tests.test_phase2a_ingest_api
 ```
 
+## Phase 2B Dry-Run Tests
+
+Adapter contract test:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m unittest backend.tests.test_phase2b_esp32_source_mock
+```
+
+Ingest manager dry-run soak test:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m unittest backend.tests.test_phase2b_ingest_dry_run
+```
+
+## Phase 3 Tests (`P3-Landmark-Quality-Test`)
+
+Landmark quality test:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m unittest backend.tests.test_phase3_landmark_quality
+```
+
+Landmark API contract test:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m unittest backend.tests.test_phase3_landmark_api
+```
+
+## Optional Manual ESP32 Mock Server
+
+Run a local mock ESP32 frame server:
+
+```bash
+.venv/bin/uvicorn backend.mock.esp32_mock_app:app --host 127.0.0.1 --port 8090
+```
+
+Then point ingest at it:
+
+```bash
+CAMERA_SOURCE_MODE=esp32_http CAMERA_SOURCE_URL=http://127.0.0.1:8090 ESP32_FRAME_PATH=/frame .venv/bin/uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 --reload
+```
+
 ## Relevant Environment Variables
 
 1. `INGEST_ENABLED` (default `true`)
 2. `CAMERA_SOURCE_MODE` (default `simulated`)
-3. `INGEST_RECONNECT_BACKOFF_SECONDS` (default `1.0`)
-4. `SIMULATED_SOURCE_FPS` (default `12.0`)
-5. `SIMULATED_DISCONNECT_AFTER_SECONDS` (default `-1.0`, disabled)
-6. `SIMULATED_DISCONNECT_DURATION_SECONDS` (default `10.0`)
-7. `GEMINI_API_KEY` (already set in your `.env`)
+3. `CAMERA_SOURCE_URL` (required for `esp32_http` mode)
+4. `INGEST_RECONNECT_BACKOFF_SECONDS` (default `1.0`)
+5. `SIMULATED_SOURCE_FPS` (default `12.0`)
+6. `SIMULATED_DISCONNECT_AFTER_SECONDS` (default `-1.0`, disabled)
+7. `SIMULATED_DISCONNECT_DURATION_SECONDS` (default `10.0`)
+8. `ESP32_FRAME_PATH` (default `/frame`)
+9. `ESP32_REQUEST_TIMEOUT_SECONDS` (default `2.0`)
+10. `ESP32_POLL_INTERVAL_SECONDS` (default `0.08`)
+11. `GEMINI_API_KEY` (already set in your `.env`)
+12. `LANDMARK_ENABLED` (default `true`)
+13. `LANDMARK_MODE` (default `mock`)
+14. `LANDMARK_QUEUE_MAXSIZE` (default `256`)
+15. `LANDMARK_RECENT_RESULTS_LIMIT` (default `50`)
+16. `MOCK_LANDMARK_DETECTION_RATE` (default `0.85`)
 
 ## Notes
 
 1. Phase 2A intentionally does not depend on ESP32 hardware.
-2. ESP32 binding happens in Phase 2B by swapping source adapter while preserving ingest manager behavior.
+2. Phase 2B dry-run is available now via mock tests; final Phase 2B sign-off still requires real hardware.
+3. Current Phase 3 runs use `LANDMARK_MODE=mock` until MediaPipe integration is turned on.

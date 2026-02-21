@@ -39,6 +39,7 @@ class JsonLogFormatter(logging.Formatter):
             "processName",
             "process",
             "message",
+            "taskName",
         }
 
         extras = {

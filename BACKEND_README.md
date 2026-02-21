@@ -364,5 +364,9 @@ Current state:
 4. Phase 2A ingest scaffold implemented with simulated source + reconnect manager.
 5. Phase 2A core soak test passes with simulated source.
 6. Phase 2A API-contract test passes.
+7. Phase 2B dry-run scaffold implemented with ESP32 HTTP adapter + mock-based tests.
+8. Phase 2B dry-run tests pass with mocked ESP32 behavior.
+9. Phase 3 landmark pipeline scaffold implemented with mock extractor + API endpoints.
+10. Phase 3 tests pass (`P3-Landmark-Quality-Test` and landmark API contract test).
 
 This document is intentionally implementation-first planning only and includes no backend code.

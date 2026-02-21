@@ -24,9 +24,17 @@ class Phase2ASourceIngestTest(unittest.IsolatedAsyncioTestCase):
             camera_source_mode="simulated",
             camera_source_url=None,
             ingest_reconnect_backoff_seconds=0.25,
+            esp32_frame_path="/frame",
+            esp32_request_timeout_seconds=1.0,
+            esp32_poll_interval_seconds=0.08,
             simulated_fps=12.0,
             simulated_disconnect_after_seconds=1.5,
             simulated_disconnect_duration_seconds=2.0,
+            landmark_enabled=True,
+            landmark_mode="mock",
+            landmark_queue_maxsize=128,
+            landmark_recent_results_limit=20,
+            mock_landmark_detection_rate=0.9,
             gemini_api_key="test-key",
         )
 
@@ -51,4 +59,3 @@ class Phase2ASourceIngestTest(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
