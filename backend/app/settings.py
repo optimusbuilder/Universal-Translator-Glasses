@@ -109,6 +109,11 @@ class Settings:
     local_classifier_min_confidence: float
     local_classifier_min_votes: int
     local_classifier_label_allowlist: str | None
+    image_classifier_model_path: str
+    image_classifier_min_confidence: float
+    image_classifier_min_votes: int
+    image_classifier_label_allowlist: str | None
+    image_classifier_input_size: int
     gemini_model: str
     gemini_api_base_url: str
     gemini_api_key: str | None
@@ -186,6 +191,13 @@ class Settings:
             "local_classifier_label_allowlist": bool(
                 (self.local_classifier_label_allowlist or "").strip()
             ),
+            "image_classifier_model_path": self.image_classifier_model_path,
+            "image_classifier_min_confidence": self.image_classifier_min_confidence,
+            "image_classifier_min_votes": self.image_classifier_min_votes,
+            "image_classifier_label_allowlist": bool(
+                (self.image_classifier_label_allowlist or "").strip()
+            ),
+            "image_classifier_input_size": self.image_classifier_input_size,
             "gemini_model": self.gemini_model,
             "gemini_api_base_url": self.gemini_api_base_url,
             "gemini_key_configured": self.gemini_key_configured,
@@ -258,7 +270,7 @@ def build_settings(project_root: Path) -> Settings:
         translation_mode=_env_mode(
             "TRANSLATION_MODE",
             "gemini",
-            ("gemini", "local_classifier"),
+            ("gemini", "local_classifier", "image_classifier"),
         ),
         translation_queue_maxsize=int(os.getenv("TRANSLATION_QUEUE_MAXSIZE", "128")),
         translation_recent_results_limit=int(
@@ -291,6 +303,19 @@ def build_settings(project_root: Path) -> Settings:
         ),
         local_classifier_min_votes=int(os.getenv("LOCAL_CLASSIFIER_MIN_VOTES", "2")),
         local_classifier_label_allowlist=os.getenv("LOCAL_CLASSIFIER_LABEL_ALLOWLIST"),
+        image_classifier_model_path=_resolve_project_path(
+            project_root,
+            os.getenv(
+                "IMAGE_CLASSIFIER_MODEL_PATH",
+                "backend/models/asl_image_classifier_v1.npz",
+            ),
+        ),
+        image_classifier_min_confidence=float(
+            os.getenv("IMAGE_CLASSIFIER_MIN_CONFIDENCE", "0.58")
+        ),
+        image_classifier_min_votes=int(os.getenv("IMAGE_CLASSIFIER_MIN_VOTES", "2")),
+        image_classifier_label_allowlist=os.getenv("IMAGE_CLASSIFIER_LABEL_ALLOWLIST"),
+        image_classifier_input_size=int(os.getenv("IMAGE_CLASSIFIER_INPUT_SIZE", "32")),
         gemini_model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
         gemini_api_base_url=os.getenv(
             "GEMINI_API_BASE_URL",

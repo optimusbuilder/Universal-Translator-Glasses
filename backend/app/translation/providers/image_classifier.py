@@ -6,6 +6,7 @@ from collections import defaultdict
 import numpy as np
 from PIL import Image
 
+from backend.app.landmarks.types import LandmarkPoint
 from backend.app.settings import Settings
 from backend.app.translation.image_classifier import (
     load_image_classifier,
@@ -91,7 +92,7 @@ class ImageClassifierTranslationProvider(TranslationProvider):
     def _crop_hand_region(
         self,
         jpeg_payload: bytes,
-        landmarks: list[object],
+        landmarks: list[LandmarkPoint],
     ) -> np.ndarray | None:
         try:
             image = Image.open(io.BytesIO(jpeg_payload)).convert("RGB")

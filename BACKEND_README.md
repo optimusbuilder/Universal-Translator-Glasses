@@ -387,6 +387,28 @@ Expected:
 1. `mode` shows `local_classifier`.
 2. `configured_model` points to the local `.npz` model file.
 
+Image classifier option (camera-frame appearance model):
+
+```bash
+.venv/bin/python -m backend.tools.train_image_asl_classifier \
+  --dataset /Users/oluwaferanmioyelude/Downloads/asl_alphabet_train \
+  --output backend/models/asl_image_classifier_v1.npz \
+  --input-size 64 \
+  --max-samples-per-class 1200 \
+  --min-samples-per-class 40 \
+  --val-split 0.2 \
+  --max-prototypes-per-label 250 \
+  --knn-k 5
+```
+
+To use it, set:
+
+1. `TRANSLATION_MODE=image_classifier`
+2. `IMAGE_CLASSIFIER_MODEL_PATH=backend/models/asl_image_classifier_v1.npz`
+3. `IMAGE_CLASSIFIER_MIN_CONFIDENCE=0.58`
+4. `IMAGE_CLASSIFIER_MIN_VOTES=2`
+5. `IMAGE_CLASSIFIER_INPUT_SIZE=64`
+
 ## 8) Current Status
 
 Current state:

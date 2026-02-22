@@ -15,6 +15,9 @@ from backend.app.translation.providers.base import (
     TranslationProviderError,
 )
 from backend.app.translation.providers.gemini import GeminiTranslationProvider
+from backend.app.translation.providers.image_classifier import (
+    ImageClassifierTranslationProvider,
+)
 from backend.app.translation.providers.local_classifier import (
     LocalClassifierTranslationProvider,
 )
@@ -158,6 +161,8 @@ class TranslationPipeline:
         payload["translation_enabled"] = self._settings.translation_enabled
         if self._settings.translation_mode == "local_classifier":
             payload["configured_model"] = self._settings.local_classifier_model_path
+        elif self._settings.translation_mode == "image_classifier":
+            payload["configured_model"] = self._settings.image_classifier_model_path
         else:
             payload["configured_model"] = self._settings.gemini_model
         payload["running"] = bool(self._task is not None and not self._task.done())
@@ -178,8 +183,13 @@ class TranslationPipeline:
             return GeminiTranslationProvider(settings=settings)
         if settings.translation_mode == "local_classifier":
             return LocalClassifierTranslationProvider(settings=settings)
+        if settings.translation_mode == "image_classifier":
+            return ImageClassifierTranslationProvider(settings=settings)
 
-        raise ValueError("unsupported translation mode. Expected 'gemini' or 'local_classifier'.")
+        raise ValueError(
+            "unsupported translation mode. Expected 'gemini', "
+            "'local_classifier', or 'image_classifier'."
+        )
 
     async def _run(self) -> None:
         while not self._stopping:
