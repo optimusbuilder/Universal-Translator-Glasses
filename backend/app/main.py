@@ -14,8 +14,12 @@ from backend.app.logging_config import configure_logging
 from backend.app.routes.health import router as health_router
 from backend.app.routes.ingest import router as ingest_router
 from backend.app.routes.landmarks import router as landmarks_router
+from backend.app.routes.realtime import router as realtime_router
+from backend.app.routes.translations import router as translations_router
 from backend.app.routes.windows import router as windows_router
+from backend.app.realtime.manager import RealtimeEventManager
 from backend.app.settings import build_settings
+from backend.app.translation.pipeline import TranslationPipeline
 from backend.app.windowing.pipeline import WindowingPipeline
 
 
@@ -36,7 +40,15 @@ def create_app() -> FastAPI:
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.settings = settings
         app.state.started_at = datetime.now(timezone.utc)
+        app.state.realtime_manager = RealtimeEventManager(settings=settings, logger=logger)
+        app.state.translation_pipeline = TranslationPipeline(settings=settings, logger=logger)
+        app.state.translation_pipeline.register_result_handler(
+            app.state.realtime_manager.publish_translation_result
+        )
         app.state.windowing_pipeline = WindowingPipeline(settings=settings, logger=logger)
+        app.state.windowing_pipeline.register_window_handler(
+            app.state.translation_pipeline.enqueue_window
+        )
         app.state.landmark_pipeline = LandmarkPipeline(settings=settings, logger=logger)
         app.state.landmark_pipeline.register_result_handler(
             app.state.windowing_pipeline.enqueue_landmark_result
@@ -45,6 +57,20 @@ def create_app() -> FastAPI:
         app.state.ingest_manager.register_frame_handler(
             app.state.landmark_pipeline.enqueue_frame
         )
+
+        def _system_metrics() -> dict[str, object]:
+            return {
+                "service": settings.service_name,
+                "version": settings.service_version,
+                "captured_at": datetime.now(timezone.utc).isoformat(),
+                "ingest": app.state.ingest_manager.snapshot(),
+                "landmark": app.state.landmark_pipeline.snapshot(),
+                "windowing": app.state.windowing_pipeline.snapshot(),
+                "translation": app.state.translation_pipeline.snapshot(),
+                "realtime": app.state.realtime_manager.snapshot(),
+            }
+
+        app.state.realtime_manager.set_metrics_provider(_system_metrics)
 
         logger.info(
             "service_startup",
@@ -63,6 +89,8 @@ def create_app() -> FastAPI:
                 "config": settings.redacted(),
             },
         )
+        await app.state.realtime_manager.start()
+        await app.state.translation_pipeline.start()
         await app.state.windowing_pipeline.start()
         await app.state.landmark_pipeline.start()
         await app.state.ingest_manager.start()
@@ -70,6 +98,8 @@ def create_app() -> FastAPI:
         await app.state.ingest_manager.stop()
         await app.state.landmark_pipeline.stop()
         await app.state.windowing_pipeline.stop()
+        await app.state.translation_pipeline.stop()
+        await app.state.realtime_manager.stop()
         logger.info(
             "service_shutdown",
             extra={
@@ -93,6 +123,8 @@ def create_app() -> FastAPI:
     app.include_router(ingest_router)
     app.include_router(landmarks_router)
     app.include_router(windows_router)
+    app.include_router(translations_router)
+    app.include_router(realtime_router)
     return app
 
 

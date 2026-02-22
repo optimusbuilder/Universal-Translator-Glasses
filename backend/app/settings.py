@@ -81,6 +81,11 @@ class Settings:
     gemini_model: str
     gemini_api_base_url: str
     gemini_api_key: str | None
+    realtime_enabled: bool = True
+    realtime_client_queue_maxsize: int = 128
+    realtime_recent_events_limit: int = 200
+    realtime_metrics_interval_seconds: float = 1.0
+    realtime_alert_cooldown_seconds: float = 3.0
 
     @property
     def camera_source_configured(self) -> bool:
@@ -131,6 +136,11 @@ class Settings:
             "gemini_model": self.gemini_model,
             "gemini_api_base_url": self.gemini_api_base_url,
             "gemini_key_configured": self.gemini_key_configured,
+            "realtime_enabled": self.realtime_enabled,
+            "realtime_client_queue_maxsize": self.realtime_client_queue_maxsize,
+            "realtime_recent_events_limit": self.realtime_recent_events_limit,
+            "realtime_metrics_interval_seconds": self.realtime_metrics_interval_seconds,
+            "realtime_alert_cooldown_seconds": self.realtime_alert_cooldown_seconds,
         }
 
 
@@ -194,4 +204,15 @@ def build_settings(project_root: Path) -> Settings:
             "https://generativelanguage.googleapis.com/v1beta",
         ),
         gemini_api_key=os.getenv("GEMINI_API_KEY"),
+        realtime_enabled=_env_bool("REALTIME_ENABLED", True),
+        realtime_client_queue_maxsize=int(
+            os.getenv("REALTIME_CLIENT_QUEUE_MAXSIZE", "128")
+        ),
+        realtime_recent_events_limit=int(os.getenv("REALTIME_RECENT_EVENTS_LIMIT", "200")),
+        realtime_metrics_interval_seconds=float(
+            os.getenv("REALTIME_METRICS_INTERVAL_SECONDS", "1.0")
+        ),
+        realtime_alert_cooldown_seconds=float(
+            os.getenv("REALTIME_ALERT_COOLDOWN_SECONDS", "3.0")
+        ),
     )

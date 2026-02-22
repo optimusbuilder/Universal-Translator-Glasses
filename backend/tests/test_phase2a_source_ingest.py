@@ -40,6 +40,16 @@ class Phase2ASourceIngestTest(unittest.IsolatedAsyncioTestCase):
             window_slide_seconds=0.5,
             window_queue_maxsize=128,
             window_recent_results_limit=40,
+            translation_enabled=True,
+            translation_mode="mock",
+            translation_queue_maxsize=128,
+            translation_recent_results_limit=80,
+            translation_timeout_seconds=2.0,
+            translation_max_retries=1,
+            translation_retry_backoff_seconds=0.1,
+            translation_uncertainty_threshold=0.6,
+            gemini_model="gemini-1.5-flash",
+            gemini_api_base_url="https://generativelanguage.googleapis.com/v1beta",
             gemini_api_key="test-key",
         )
 

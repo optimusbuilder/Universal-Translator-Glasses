@@ -370,5 +370,7 @@ Current state:
 10. Phase 3 tests pass (`P3-Landmark-Quality-Test` and landmark API contract test).
 11. Phase 4 windowing pipeline scaffold implemented with rolling landmark buffer + window endpoints.
 12. Phase 4 tests pass (`P4-Window-Integrity-Test` and window API contract test).
+13. Phase 5 translation pipeline scaffold implemented with mock/gemini providers + retry policy.
+14. Phase 5 tests pass (`P5-Translation-Contract-Test` and translation API contract test).
 
 This document is intentionally implementation-first planning only and includes no backend code.
