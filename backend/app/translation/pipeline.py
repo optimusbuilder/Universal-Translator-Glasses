@@ -15,6 +15,9 @@ from backend.app.translation.providers.base import (
     TranslationProviderError,
 )
 from backend.app.translation.providers.gemini import GeminiTranslationProvider
+from backend.app.translation.providers.local_classifier import (
+    LocalClassifierTranslationProvider,
+)
 from backend.app.translation.types import TranslationPayload, TranslationResult
 from backend.app.windowing.types import LandmarkWindow
 
@@ -37,6 +40,8 @@ class TranslationMetrics:
     average_processing_ms: float = 0.0
     last_processing_ms: float = 0.0
     last_result_at: str | None = None
+    last_model_text_preview: str | None = None
+    last_normalized_text_preview: str | None = None
     last_error: str | None = None
     queue_size: int = 0
 
@@ -63,6 +68,8 @@ class TranslationPipeline:
             maxlen=max(1, settings.translation_recent_results_limit)
         )
         self._result_handlers: list[Callable[[TranslationResult], Awaitable[None]]] = []
+        self._next_request_at: float = 0.0
+        self._rate_limited_until: float = 0.0
 
     def register_result_handler(
         self, handler: Callable[[TranslationResult], Awaitable[None]]
@@ -147,9 +154,17 @@ class TranslationPipeline:
     def snapshot(self) -> dict[str, object]:
         payload = asdict(self._metrics)
         payload["translation_enabled"] = self._settings.translation_enabled
+        if self._settings.translation_mode == "local_classifier":
+            payload["configured_model"] = self._settings.local_classifier_model_path
+        else:
+            payload["configured_model"] = self._settings.gemini_model
         payload["running"] = bool(self._task is not None and not self._task.done())
         payload["queue_size"] = self._queue.qsize()
         payload["recent_results_count"] = len(self._recent_results)
+        payload["rate_limited_remaining_seconds"] = round(
+            max(0.0, self._rate_limited_until - monotonic()),
+            3,
+        )
         return payload
 
     def recent_results(self, limit: int = 10) -> list[dict[str, object]]:
@@ -159,8 +174,10 @@ class TranslationPipeline:
     def _build_provider(self, settings: Settings) -> TranslationProvider:
         if settings.translation_mode == "gemini":
             return GeminiTranslationProvider(settings=settings)
+        if settings.translation_mode == "local_classifier":
+            return LocalClassifierTranslationProvider(settings=settings)
 
-        raise ValueError("unsupported translation mode. Expected 'gemini'.")
+        raise ValueError("unsupported translation mode. Expected 'gemini' or 'local_classifier'.")
 
     async def _run(self) -> None:
         while not self._stopping:
@@ -171,6 +188,16 @@ class TranslationPipeline:
                 self._queue.task_done()
 
     async def _process_window(self, window: LandmarkWindow) -> None:
+        if self._settings.translation_mode == "gemini":
+            now = monotonic()
+            if now < self._rate_limited_until:
+                async with self._lock:
+                    self._metrics.windows_suppressed_unclear += 1
+                    self._metrics.queue_size = self._queue.qsize()
+                    self._metrics.healthy = True
+                    self._metrics.last_error = "gemini_rate_limited_backoff"
+                return
+
         frames_with_hands = sum(1 for frame in window.frames if frame.hands)
         if frames_with_hands < max(1, self._settings.translation_min_frames_with_hands):
             async with self._lock:
@@ -187,14 +214,28 @@ class TranslationPipeline:
 
         max_attempts = max(1, self._settings.translation_max_retries + 1)
         for attempt in range(max_attempts):
+            if self._settings.translation_mode == "gemini":
+                await self._apply_request_throttle()
             try:
                 payload = await self._provider.translate(window)
+                if self._settings.translation_mode == "gemini":
+                    self._mark_request_sent()
                 break
             except TranslationProviderError as exc:
+                if self._settings.translation_mode == "gemini":
+                    self._mark_request_sent()
                 retry_count = attempt
                 last_error = str(exc)
                 async with self._lock:
                     self._metrics.retry_events += 1
+                    self._metrics.last_error = last_error
+
+                if (
+                    self._settings.translation_mode == "gemini"
+                    and last_error.startswith("gemini_rate_limited")
+                ):
+                    self._apply_rate_limit_backoff(last_error)
+                    break
 
                 if attempt + 1 < max_attempts:
                     await asyncio.sleep(self._settings.translation_retry_backoff_seconds)
@@ -204,8 +245,19 @@ class TranslationPipeline:
             async with self._lock:
                 self._metrics.last_error = last_error or "translation_failed"
                 self._metrics.healthy = False
+                self._metrics.last_model_text_preview = None
+                self._metrics.last_normalized_text_preview = "[unclear]"
+
+        raw_preview = (payload.text or "").strip().replace("\n", " ")
+        if len(raw_preview) > 120:
+            raw_preview = f"{raw_preview[:117]}..."
+        async with self._lock:
+            self._metrics.last_model_text_preview = raw_preview or None
 
         final_text, final_conf, uncertain = self._normalize_translation(payload)
+        async with self._lock:
+            self._metrics.last_normalized_text_preview = final_text
+
         if final_text == "[unclear]" and not self._settings.translation_emit_unclear_captions:
             async with self._lock:
                 self._metrics.windows_suppressed_unclear += 1
@@ -276,6 +328,39 @@ class TranslationPipeline:
                 3,
             )
 
+    async def _apply_request_throttle(self) -> None:
+        min_interval = max(0.0, self._settings.translation_min_request_interval_seconds)
+        if min_interval <= 0:
+            return
+        now = monotonic()
+        if now < self._next_request_at:
+            await asyncio.sleep(self._next_request_at - now)
+
+    def _mark_request_sent(self) -> None:
+        min_interval = max(0.0, self._settings.translation_min_request_interval_seconds)
+        if min_interval <= 0:
+            return
+        self._next_request_at = monotonic() + min_interval
+
+    def _apply_rate_limit_backoff(self, error_message: str) -> None:
+        default_backoff = max(
+            0.0,
+            self._settings.translation_rate_limit_cooldown_seconds,
+        )
+        parsed_backoff = self._parse_backoff_from_error(error_message)
+        cooldown = max(default_backoff, parsed_backoff)
+        self._rate_limited_until = monotonic() + cooldown
+
+    def _parse_backoff_from_error(self, error_message: str) -> float:
+        if ":" not in error_message:
+            return 0.0
+        _, _, tail = error_message.partition(":")
+        try:
+            value = float(tail)
+        except ValueError:
+            return 0.0
+        return max(0.0, value)
+
     def _normalize_translation(self, payload: TranslationPayload) -> tuple[str, float, bool]:
         text = (payload.text or "").strip()
         text = text.replace("`", "").replace('"', "").strip()
@@ -286,7 +371,7 @@ class TranslationPipeline:
         lowered = text.lower()
         compact = lowered.strip("[](){}:;,.!? ").strip()
         prompt_leak_markers = (
-            "think ",
+            "think",
             "window metadata",
             "frames json",
             "asl hand-landmark",
@@ -296,7 +381,11 @@ class TranslationPipeline:
             "translate asl",
             "no extra commentary",
         )
-        prompt_leak = any(marker in lowered for marker in prompt_leak_markers)
+        prompt_leak = (
+            any(marker in lowered for marker in prompt_leak_markers)
+            or compact in {"think", "thought", "reasoning", "analysis"}
+            or compact.startswith("think:")
+        )
         alpha_count = sum(1 for char in text if char.isalpha())
         punctuation_only = all(not char.isalnum() for char in text)
         unmatched_brackets = text.count("[") != text.count("]")
@@ -310,7 +399,7 @@ class TranslationPipeline:
 
         if (
             prompt_leak
-            "unclear" in lowered
+            or "unclear" in lowered
             or unclear_prefix_token
             or lowered in {"unknown", "n/a", "na"}
             or punctuation_only

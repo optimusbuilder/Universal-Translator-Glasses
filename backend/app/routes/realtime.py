@@ -32,7 +32,18 @@ async def events_websocket(websocket: WebSocket) -> None:
 
     try:
         while True:
-            await websocket.receive()
+            try:
+                message = await websocket.receive()
+            except WebSocketDisconnect:
+                break
+            except RuntimeError as exc:
+                # Starlette can raise RuntimeError after a disconnect frame has been consumed.
+                if "disconnect message has been received" in str(exc).lower():
+                    break
+                raise
+
+            if message.get("type") == "websocket.disconnect":
+                break
     except WebSocketDisconnect:
         pass
     finally:

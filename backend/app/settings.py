@@ -94,6 +94,10 @@ class Settings:
     translation_uncertainty_threshold: float
     translation_min_frames_with_hands: int
     translation_emit_unclear_captions: bool
+    local_classifier_model_path: str
+    local_classifier_min_confidence: float
+    local_classifier_min_votes: int
+    local_classifier_label_allowlist: str | None
     gemini_model: str
     gemini_api_base_url: str
     gemini_api_key: str | None
@@ -106,6 +110,12 @@ class Settings:
     realtime_queue_depth_alert_threshold: int = 32
     landmark_adaptive_frame_skip_enabled: bool = True
     landmark_adaptive_skip_threshold: float = 0.75
+    translation_window_max_frames: int = 10
+    translation_hand_confidence_threshold: float = 0.65
+    translation_output_max_tokens: int = 24
+    translation_temperature: float = 0.0
+    translation_min_request_interval_seconds: float = 1.0
+    translation_rate_limit_cooldown_seconds: float = 8.0
 
     @property
     def camera_source_configured(self) -> bool:
@@ -159,6 +169,12 @@ class Settings:
             "translation_uncertainty_threshold": self.translation_uncertainty_threshold,
             "translation_min_frames_with_hands": self.translation_min_frames_with_hands,
             "translation_emit_unclear_captions": self.translation_emit_unclear_captions,
+            "local_classifier_model_path": self.local_classifier_model_path,
+            "local_classifier_min_confidence": self.local_classifier_min_confidence,
+            "local_classifier_min_votes": self.local_classifier_min_votes,
+            "local_classifier_label_allowlist": bool(
+                (self.local_classifier_label_allowlist or "").strip()
+            ),
             "gemini_model": self.gemini_model,
             "gemini_api_base_url": self.gemini_api_base_url,
             "gemini_key_configured": self.gemini_key_configured,
@@ -171,6 +187,12 @@ class Settings:
             "realtime_queue_depth_alert_threshold": self.realtime_queue_depth_alert_threshold,
             "landmark_adaptive_frame_skip_enabled": self.landmark_adaptive_frame_skip_enabled,
             "landmark_adaptive_skip_threshold": self.landmark_adaptive_skip_threshold,
+            "translation_window_max_frames": self.translation_window_max_frames,
+            "translation_hand_confidence_threshold": self.translation_hand_confidence_threshold,
+            "translation_output_max_tokens": self.translation_output_max_tokens,
+            "translation_temperature": self.translation_temperature,
+            "translation_min_request_interval_seconds": self.translation_min_request_interval_seconds,
+            "translation_rate_limit_cooldown_seconds": self.translation_rate_limit_cooldown_seconds,
         }
 
 
@@ -219,7 +241,11 @@ def build_settings(project_root: Path) -> Settings:
         window_queue_maxsize=int(os.getenv("WINDOW_QUEUE_MAXSIZE", "128")),
         window_recent_results_limit=int(os.getenv("WINDOW_RECENT_RESULTS_LIMIT", "40")),
         translation_enabled=_env_bool("TRANSLATION_ENABLED", True),
-        translation_mode=_env_mode("TRANSLATION_MODE", "gemini", ("gemini",)),
+        translation_mode=_env_mode(
+            "TRANSLATION_MODE",
+            "gemini",
+            ("gemini", "local_classifier"),
+        ),
         translation_queue_maxsize=int(os.getenv("TRANSLATION_QUEUE_MAXSIZE", "128")),
         translation_recent_results_limit=int(
             os.getenv("TRANSLATION_RECENT_RESULTS_LIMIT", "80")
@@ -239,6 +265,15 @@ def build_settings(project_root: Path) -> Settings:
             "TRANSLATION_EMIT_UNCLEAR_CAPTIONS",
             False,
         ),
+        local_classifier_model_path=os.getenv(
+            "LOCAL_CLASSIFIER_MODEL_PATH",
+            "backend/models/asl_landmark_classifier_v1.npz",
+        ),
+        local_classifier_min_confidence=float(
+            os.getenv("LOCAL_CLASSIFIER_MIN_CONFIDENCE", "0.55")
+        ),
+        local_classifier_min_votes=int(os.getenv("LOCAL_CLASSIFIER_MIN_VOTES", "2")),
+        local_classifier_label_allowlist=os.getenv("LOCAL_CLASSIFIER_LABEL_ALLOWLIST"),
         gemini_model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
         gemini_api_base_url=os.getenv(
             "GEMINI_API_BASE_URL",
@@ -267,5 +302,23 @@ def build_settings(project_root: Path) -> Settings:
         ),
         landmark_adaptive_skip_threshold=float(
             os.getenv("LANDMARK_ADAPTIVE_SKIP_THRESHOLD", "0.75")
+        ),
+        translation_window_max_frames=int(
+            os.getenv("TRANSLATION_WINDOW_MAX_FRAMES", "10")
+        ),
+        translation_hand_confidence_threshold=float(
+            os.getenv("TRANSLATION_HAND_CONFIDENCE_THRESHOLD", "0.65")
+        ),
+        translation_output_max_tokens=int(
+            os.getenv("TRANSLATION_OUTPUT_MAX_TOKENS", "24")
+        ),
+        translation_temperature=float(
+            os.getenv("TRANSLATION_TEMPERATURE", "0.0")
+        ),
+        translation_min_request_interval_seconds=float(
+            os.getenv("TRANSLATION_MIN_REQUEST_INTERVAL_SECONDS", "1.0")
+        ),
+        translation_rate_limit_cooldown_seconds=float(
+            os.getenv("TRANSLATION_RATE_LIMIT_COOLDOWN_SECONDS", "8.0")
         ),
     )

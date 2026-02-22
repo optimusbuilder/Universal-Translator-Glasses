@@ -354,7 +354,40 @@ Artifacts to capture:
 2. If a phase test fails, fix and re-run until pass.
 3. At end of each day, run the latest passed phase test plus a quick smoke of previous phase.
 
-## 7) Current Status
+## 7) Local Classifier Mode (Gemini Alternative)
+
+You can run translation without Gemini by training a local landmark classifier and switching `TRANSLATION_MODE`.
+
+Train model (example with your ASL alphabet dataset):
+
+```bash
+.venv/bin/python -m backend.tools.train_local_asl_classifier \
+  --dataset /Users/oluwaferanmioyelude/Downloads/asl_alphabet_train \
+  --output backend/models/asl_landmark_classifier_v1.npz \
+  --max-samples-per-class 250 \
+  --min-samples-per-class 40 \
+  --min-hand-confidence 0.35
+```
+
+Then set in `.env`:
+
+1. `TRANSLATION_MODE=local_classifier`
+2. `LOCAL_CLASSIFIER_MODEL_PATH=backend/models/asl_landmark_classifier_v1.npz`
+3. `LOCAL_CLASSIFIER_MIN_CONFIDENCE=0.58`
+4. `LOCAL_CLASSIFIER_MIN_VOTES=2`
+
+Restart backend and confirm:
+
+```bash
+curl -s http://127.0.0.1:8000/translations/status
+```
+
+Expected:
+
+1. `mode` shows `local_classifier`.
+2. `configured_model` points to the local `.npz` model file.
+
+## 8) Current Status
 
 Current state:
 
