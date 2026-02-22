@@ -65,6 +65,11 @@ class Settings:
     ingest_enabled: bool
     camera_source_mode: str
     camera_source_url: str | None
+    opencv_source: str
+    opencv_poll_interval_seconds: float
+    opencv_width: int
+    opencv_height: int
+    opencv_jpeg_quality: int
     ingest_reconnect_backoff_seconds: float
     esp32_frame_path: str
     esp32_request_timeout_seconds: float
@@ -104,7 +109,11 @@ class Settings:
 
     @property
     def camera_source_configured(self) -> bool:
-        return bool(self.camera_source_url)
+        if self.camera_source_mode == "esp32_http":
+            return bool(self.camera_source_url)
+        if self.camera_source_mode == "opencv_capture":
+            return bool(self.opencv_source.strip())
+        return False
 
     @property
     def gemini_key_configured(self) -> bool:
@@ -121,6 +130,11 @@ class Settings:
             "ingest_enabled": self.ingest_enabled,
             "camera_source_mode": self.camera_source_mode,
             "camera_source_configured": self.camera_source_configured,
+            "opencv_source": self.opencv_source,
+            "opencv_poll_interval_seconds": self.opencv_poll_interval_seconds,
+            "opencv_width": self.opencv_width,
+            "opencv_height": self.opencv_height,
+            "opencv_jpeg_quality": self.opencv_jpeg_quality,
             "ingest_reconnect_backoff_seconds": self.ingest_reconnect_backoff_seconds,
             "esp32_frame_path": self.esp32_frame_path,
             "esp32_request_timeout_seconds": self.esp32_request_timeout_seconds,
@@ -174,9 +188,16 @@ def build_settings(project_root: Path) -> Settings:
         camera_source_mode=_env_mode(
             "CAMERA_SOURCE_MODE",
             "esp32_http",
-            ("esp32_http",),
+            ("esp32_http", "opencv_capture"),
         ),
         camera_source_url=os.getenv("CAMERA_SOURCE_URL"),
+        opencv_source=os.getenv("OPENCV_SOURCE", "0").strip(),
+        opencv_poll_interval_seconds=float(
+            os.getenv("OPENCV_POLL_INTERVAL_SECONDS", "0.08")
+        ),
+        opencv_width=int(os.getenv("OPENCV_WIDTH", "640")),
+        opencv_height=int(os.getenv("OPENCV_HEIGHT", "480")),
+        opencv_jpeg_quality=int(os.getenv("OPENCV_JPEG_QUALITY", "85")),
         ingest_reconnect_backoff_seconds=float(
             os.getenv("INGEST_RECONNECT_BACKOFF_SECONDS", "1.0")
         ),

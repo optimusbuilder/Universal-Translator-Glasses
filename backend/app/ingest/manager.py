@@ -15,6 +15,7 @@ from backend.app.ingest.sources.base import (
     FramePacket,
 )
 from backend.app.ingest.sources.esp32_http import ESP32HttpCameraSource
+from backend.app.ingest.sources.opencv_capture import OpenCVCameraSource
 from backend.app.settings import Settings
 
 
@@ -115,8 +116,22 @@ class IngestManager:
                 poll_interval_seconds=settings.esp32_poll_interval_seconds,
             )
 
+        if settings.camera_source_mode == "opencv_capture":
+            if not settings.opencv_source.strip():
+                raise ValueError(
+                    "opencv_source is required for CAMERA_SOURCE_MODE=opencv_capture"
+                )
+
+            return lambda: OpenCVCameraSource(
+                source=settings.opencv_source,
+                poll_interval_seconds=settings.opencv_poll_interval_seconds,
+                width=settings.opencv_width,
+                height=settings.opencv_height,
+                jpeg_quality=settings.opencv_jpeg_quality,
+            )
+
         raise ValueError(
-            "unsupported camera source mode. Expected 'esp32_http'."
+            "unsupported camera source mode. Expected 'esp32_http' or 'opencv_capture'."
         )
 
     async def _run(self) -> None:

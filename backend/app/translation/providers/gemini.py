@@ -88,13 +88,14 @@ class GeminiTranslationProvider(TranslationProvider):
         if not frame_summary:
             return (
                 "No reliable hand landmarks detected in this window. "
-                "Return exactly: [unclear]"
+                "Return exactly: UNCLEAR"
             )
 
         return (
             "You translate ASL hand-landmark sequences to short plain English.\n"
             "Return exactly one line and no extra commentary.\n"
-            "If the sign is ambiguous, return exactly: [unclear]\n"
+            "If uncertain, return exactly: UNCLEAR\n"
+            "Do not use brackets, bullets, markdown, or JSON.\n"
             f"Window metadata: id={window.window_id}, frame_count={window.frame_count}\n"
             f"Frames JSON: {json.dumps(frame_summary, separators=(',', ':'))}"
         )
@@ -118,6 +119,9 @@ class GeminiTranslationProvider(TranslationProvider):
         return " ".join(segment.strip() for segment in segments if segment.strip()).strip()
 
     def _estimate_confidence(self, text: str) -> float:
-        if "unclear" in text.lower():
+        lowered = text.lower().strip()
+        if "unclear" in lowered or lowered in {"unknown", "n/a", "na"}:
             return 0.45
+        if len("".join(ch for ch in text if ch.isalpha())) < 2:
+            return 0.4
         return 0.75
