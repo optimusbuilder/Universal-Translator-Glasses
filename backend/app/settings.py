@@ -65,6 +65,21 @@ class Settings:
     landmark_queue_maxsize: int
     landmark_recent_results_limit: int
     mock_landmark_detection_rate: float
+    windowing_enabled: bool
+    window_duration_seconds: float
+    window_slide_seconds: float
+    window_queue_maxsize: int
+    window_recent_results_limit: int
+    translation_enabled: bool
+    translation_mode: str
+    translation_queue_maxsize: int
+    translation_recent_results_limit: int
+    translation_timeout_seconds: float
+    translation_max_retries: int
+    translation_retry_backoff_seconds: float
+    translation_uncertainty_threshold: float
+    gemini_model: str
+    gemini_api_base_url: str
     gemini_api_key: str | None
 
     @property
@@ -100,6 +115,21 @@ class Settings:
             "landmark_queue_maxsize": self.landmark_queue_maxsize,
             "landmark_recent_results_limit": self.landmark_recent_results_limit,
             "mock_landmark_detection_rate": self.mock_landmark_detection_rate,
+            "windowing_enabled": self.windowing_enabled,
+            "window_duration_seconds": self.window_duration_seconds,
+            "window_slide_seconds": self.window_slide_seconds,
+            "window_queue_maxsize": self.window_queue_maxsize,
+            "window_recent_results_limit": self.window_recent_results_limit,
+            "translation_enabled": self.translation_enabled,
+            "translation_mode": self.translation_mode,
+            "translation_queue_maxsize": self.translation_queue_maxsize,
+            "translation_recent_results_limit": self.translation_recent_results_limit,
+            "translation_timeout_seconds": self.translation_timeout_seconds,
+            "translation_max_retries": self.translation_max_retries,
+            "translation_retry_backoff_seconds": self.translation_retry_backoff_seconds,
+            "translation_uncertainty_threshold": self.translation_uncertainty_threshold,
+            "gemini_model": self.gemini_model,
+            "gemini_api_base_url": self.gemini_api_base_url,
             "gemini_key_configured": self.gemini_key_configured,
         }
 
@@ -139,5 +169,29 @@ def build_settings(project_root: Path) -> Settings:
         landmark_queue_maxsize=int(os.getenv("LANDMARK_QUEUE_MAXSIZE", "256")),
         landmark_recent_results_limit=int(os.getenv("LANDMARK_RECENT_RESULTS_LIMIT", "50")),
         mock_landmark_detection_rate=float(os.getenv("MOCK_LANDMARK_DETECTION_RATE", "0.85")),
+        windowing_enabled=_env_bool("WINDOWING_ENABLED", True),
+        window_duration_seconds=float(os.getenv("WINDOW_DURATION_SECONDS", "1.5")),
+        window_slide_seconds=float(os.getenv("WINDOW_SLIDE_SECONDS", "0.5")),
+        window_queue_maxsize=int(os.getenv("WINDOW_QUEUE_MAXSIZE", "128")),
+        window_recent_results_limit=int(os.getenv("WINDOW_RECENT_RESULTS_LIMIT", "40")),
+        translation_enabled=_env_bool("TRANSLATION_ENABLED", True),
+        translation_mode=os.getenv("TRANSLATION_MODE", "mock").strip().lower(),
+        translation_queue_maxsize=int(os.getenv("TRANSLATION_QUEUE_MAXSIZE", "128")),
+        translation_recent_results_limit=int(
+            os.getenv("TRANSLATION_RECENT_RESULTS_LIMIT", "80")
+        ),
+        translation_timeout_seconds=float(os.getenv("TRANSLATION_TIMEOUT_SECONDS", "4.0")),
+        translation_max_retries=int(os.getenv("TRANSLATION_MAX_RETRIES", "2")),
+        translation_retry_backoff_seconds=float(
+            os.getenv("TRANSLATION_RETRY_BACKOFF_SECONDS", "0.25")
+        ),
+        translation_uncertainty_threshold=float(
+            os.getenv("TRANSLATION_UNCERTAINTY_THRESHOLD", "0.6")
+        ),
+        gemini_model=os.getenv("GEMINI_MODEL", "gemini-1.5-flash"),
+        gemini_api_base_url=os.getenv(
+            "GEMINI_API_BASE_URL",
+            "https://generativelanguage.googleapis.com/v1beta",
+        ),
         gemini_api_key=os.getenv("GEMINI_API_KEY"),
     )

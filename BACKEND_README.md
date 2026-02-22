@@ -368,5 +368,7 @@ Current state:
 8. Phase 2B dry-run tests pass with mocked ESP32 behavior.
 9. Phase 3 landmark pipeline scaffold implemented with mock extractor + API endpoints.
 10. Phase 3 tests pass (`P3-Landmark-Quality-Test` and landmark API contract test).
+11. Phase 4 windowing pipeline scaffold implemented with rolling landmark buffer + window endpoints.
+12. Phase 4 tests pass (`P4-Window-Integrity-Test` and window API contract test).
 
 This document is intentionally implementation-first planning only and includes no backend code.

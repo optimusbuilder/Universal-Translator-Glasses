@@ -36,6 +36,11 @@ class Phase3LandmarkQualityTest(unittest.IsolatedAsyncioTestCase):
             landmark_queue_maxsize=128,
             landmark_recent_results_limit=25,
             mock_landmark_detection_rate=1.0,
+            windowing_enabled=True,
+            window_duration_seconds=1.5,
+            window_slide_seconds=0.5,
+            window_queue_maxsize=128,
+            window_recent_results_limit=40,
             gemini_api_key="test-key",
         )
 
@@ -77,4 +82,3 @@ class Phase3LandmarkQualityTest(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

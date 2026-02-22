@@ -14,8 +14,10 @@ def get_health(request: Request) -> dict[str, Any]:
     started_at = request.app.state.started_at
     ingest_manager = request.app.state.ingest_manager
     landmark_pipeline = request.app.state.landmark_pipeline
+    windowing_pipeline = request.app.state.windowing_pipeline
     ingest_snapshot = ingest_manager.snapshot()
     landmark_snapshot = landmark_pipeline.snapshot()
+    window_snapshot = windowing_pipeline.snapshot()
     now = datetime.now(timezone.utc)
     uptime_seconds = max(0.0, (now - started_at).total_seconds())
 
@@ -36,5 +38,8 @@ def get_health(request: Request) -> dict[str, Any]:
             "landmark_enabled": landmark_snapshot["landmark_enabled"],
             "landmark_running": landmark_snapshot["running"],
             "landmark_healthy": landmark_snapshot["healthy"],
+            "windowing_enabled": window_snapshot["windowing_enabled"],
+            "windowing_running": window_snapshot["running"],
+            "windowing_healthy": window_snapshot["healthy"],
         },
     }

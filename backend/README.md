@@ -1,4 +1,4 @@
-# Backend Setup (Phase 1 + Phase 2A + Phase 2B Dry-Run + Phase 3)
+# Backend Setup (Phase 1 + Phase 2A + Phase 2B Dry-Run + Phase 3 + Phase 4)
 
 This backend currently implements:
 
@@ -6,6 +6,7 @@ This backend currently implements:
 2. Phase 2A: source-agnostic ingest manager with simulated camera source, reconnect logic, and ingest metrics.
 3. Phase 2B dry-run: ESP32 HTTP adapter with mock-driven validation (no hardware required).
 4. Phase 3: landmark extraction pipeline with queueing, mock extractor, and status endpoints.
+5. Phase 4: temporal windowing pipeline over landmark results with window status endpoints.
 
 ## Implemented Endpoints
 
@@ -13,6 +14,8 @@ This backend currently implements:
 2. `GET /ingest/status`: ingest metrics snapshot.
 3. `GET /landmarks/status`: landmark pipeline metrics snapshot.
 4. `GET /landmarks/recent?limit=<n>`: recent landmark extraction payloads.
+5. `GET /windows/status`: windowing pipeline metrics snapshot.
+6. `GET /windows/recent?limit=<n>`: recent emitted landmark windows.
 
 ## Backend Files
 
@@ -31,6 +34,9 @@ This backend currently implements:
 13. `backend/app/landmarks/extractors/mock.py`: deterministic mock hand landmark extractor.
 14. `backend/app/landmarks/extractors/mediapipe.py`: mediapipe-mode placeholder extractor.
 15. `backend/app/routes/landmarks.py`: landmark status/result endpoints.
+16. `backend/app/windowing/pipeline.py`: landmark-sequence window builder.
+17. `backend/app/windowing/types.py`: window schema.
+18. `backend/app/routes/windows.py`: window status/result endpoints.
 
 ## Tests
 
@@ -41,6 +47,8 @@ This backend currently implements:
 5. `backend/tests/test_phase2b_ingest_dry_run.py`: Phase 2B dry-run soak test (mock transport).
 6. `backend/tests/test_phase3_landmark_quality.py`: Phase 3 landmark quality test.
 7. `backend/tests/test_phase3_landmark_api.py`: Phase 3 API contract test.
+8. `backend/tests/test_phase4_window_integrity.py`: Phase 4 window integrity test.
+9. `backend/tests/test_phase4_window_api.py`: Phase 4 API contract test.
 
 ## Install
 
@@ -117,6 +125,20 @@ Landmark API contract test:
 PYTHONPATH=. .venv/bin/python -m unittest backend.tests.test_phase3_landmark_api
 ```
 
+## Phase 4 Tests (`P4-Window-Integrity-Test`)
+
+Window integrity test:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m unittest backend.tests.test_phase4_window_integrity
+```
+
+Window API contract test:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m unittest backend.tests.test_phase4_window_api
+```
+
 ## Optional Manual ESP32 Mock Server
 
 Run a local mock ESP32 frame server:
@@ -149,9 +171,15 @@ CAMERA_SOURCE_MODE=esp32_http CAMERA_SOURCE_URL=http://127.0.0.1:8090 ESP32_FRAM
 14. `LANDMARK_QUEUE_MAXSIZE` (default `256`)
 15. `LANDMARK_RECENT_RESULTS_LIMIT` (default `50`)
 16. `MOCK_LANDMARK_DETECTION_RATE` (default `0.85`)
+17. `WINDOWING_ENABLED` (default `true`)
+18. `WINDOW_DURATION_SECONDS` (default `1.5`)
+19. `WINDOW_SLIDE_SECONDS` (default `0.5`)
+20. `WINDOW_QUEUE_MAXSIZE` (default `128`)
+21. `WINDOW_RECENT_RESULTS_LIMIT` (default `40`)
 
 ## Notes
 
 1. Phase 2A intentionally does not depend on ESP32 hardware.
 2. Phase 2B dry-run is available now via mock tests; final Phase 2B sign-off still requires real hardware.
 3. Current Phase 3 runs use `LANDMARK_MODE=mock` until MediaPipe integration is turned on.
+4. Phase 4 windows currently feed inspection endpoints and are ready for Phase 5 translation integration.

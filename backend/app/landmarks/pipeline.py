@@ -6,7 +6,7 @@ from collections import deque
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from time import monotonic
-from typing import Callable
+from typing import Awaitable, Callable
 
 from backend.app.ingest.sources.base import FramePacket
 from backend.app.landmarks.extractors.base import HandLandmarkExtractor, LandmarkExtractorError
@@ -54,9 +54,16 @@ class LandmarkPipeline:
         self._task: asyncio.Task[None] | None = None
         self._stopping = False
         self._lock = asyncio.Lock()
+        self._result_handlers: list[Callable[[LandmarkResult], Awaitable[None]]] = []
         self._recent_results: deque[LandmarkResult] = deque(
             maxlen=max(1, settings.landmark_recent_results_limit)
         )
+
+    def register_result_handler(
+        self,
+        handler: Callable[[LandmarkResult], Awaitable[None]],
+    ) -> None:
+        self._result_handlers.append(handler)
 
     async def start(self) -> None:
         if not self._settings.landmark_enabled:
@@ -202,6 +209,21 @@ class LandmarkPipeline:
                     / max(1, self._metrics.frames_processed),
                     3,
                 )
+
+            for handler in self._result_handlers:
+                try:
+                    await handler(result)
+                except Exception as exc:  # pragma: no cover - safety net
+                    self._logger.error(
+                        "landmark_result_handler_error",
+                        extra={
+                            "event": "landmark_result_handler_error",
+                            "service_name": self._settings.service_name,
+                            "service_version": self._settings.service_version,
+                            "reason": str(exc),
+                            "frame_id": frame.frame_id,
+                        },
+                    )
         except LandmarkExtractorError as exc:
             async with self._lock:
                 self._metrics.last_error = str(exc)
@@ -234,4 +256,3 @@ class LandmarkPipeline:
                     "frame_id": frame.frame_id,
                 },
             )
-

@@ -14,7 +14,9 @@ from backend.app.logging_config import configure_logging
 from backend.app.routes.health import router as health_router
 from backend.app.routes.ingest import router as ingest_router
 from backend.app.routes.landmarks import router as landmarks_router
+from backend.app.routes.windows import router as windows_router
 from backend.app.settings import build_settings
+from backend.app.windowing.pipeline import WindowingPipeline
 
 
 def _project_root() -> Path:
@@ -34,7 +36,11 @@ def create_app() -> FastAPI:
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.settings = settings
         app.state.started_at = datetime.now(timezone.utc)
+        app.state.windowing_pipeline = WindowingPipeline(settings=settings, logger=logger)
         app.state.landmark_pipeline = LandmarkPipeline(settings=settings, logger=logger)
+        app.state.landmark_pipeline.register_result_handler(
+            app.state.windowing_pipeline.enqueue_landmark_result
+        )
         app.state.ingest_manager = IngestManager(settings=settings, logger=logger)
         app.state.ingest_manager.register_frame_handler(
             app.state.landmark_pipeline.enqueue_frame
@@ -57,11 +63,13 @@ def create_app() -> FastAPI:
                 "config": settings.redacted(),
             },
         )
+        await app.state.windowing_pipeline.start()
         await app.state.landmark_pipeline.start()
         await app.state.ingest_manager.start()
         yield
         await app.state.ingest_manager.stop()
         await app.state.landmark_pipeline.stop()
+        await app.state.windowing_pipeline.stop()
         logger.info(
             "service_shutdown",
             extra={
@@ -84,6 +92,7 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(ingest_router)
     app.include_router(landmarks_router)
+    app.include_router(windows_router)
     return app
 
 
