@@ -42,6 +42,8 @@ class TranslationMetrics:
     last_result_at: str | None = None
     last_model_text_preview: str | None = None
     last_normalized_text_preview: str | None = None
+    last_window_frame_count: int = 0
+    last_window_frames_with_hands: int = 0
     last_error: str | None = None
     queue_size: int = 0
 
@@ -199,12 +201,18 @@ class TranslationPipeline:
                 return
 
         frames_with_hands = sum(1 for frame in window.frames if frame.hands)
+        async with self._lock:
+            self._metrics.last_window_frame_count = len(window.frames)
+            self._metrics.last_window_frames_with_hands = frames_with_hands
         if frames_with_hands < max(1, self._settings.translation_min_frames_with_hands):
             async with self._lock:
                 self._metrics.windows_skipped_low_signal += 1
                 self._metrics.queue_size = self._queue.qsize()
                 self._metrics.healthy = True
-                self._metrics.last_error = None
+                self._metrics.last_error = (
+                    "low_signal_window:"
+                    f"{frames_with_hands}/{max(1, self._settings.translation_min_frames_with_hands)}"
+                )
             return
 
         started = monotonic()
@@ -370,27 +378,38 @@ class TranslationPipeline:
 
         lowered = text.lower()
         compact = lowered.strip("[](){}:;,.!? ").strip()
-        prompt_leak_markers = (
-            "think",
-            "window metadata",
-            "frames json",
-            "asl hand-landmark",
-            "return exactly one line",
-            "do not use brackets",
-            "if uncertain",
-            "translate asl",
-            "no extra commentary",
-        )
-        prompt_leak = (
-            any(marker in lowered for marker in prompt_leak_markers)
-            or compact in {"think", "thought", "reasoning", "analysis"}
-            or compact.startswith("think:")
-        )
+        prompt_leak = False
+        if self._settings.translation_mode == "gemini":
+            prompt_leak_markers = (
+                "think",
+                "window metadata",
+                "frames json",
+                "asl hand-landmark",
+                "return exactly one line",
+                "do not use brackets",
+                "if uncertain",
+                "translate asl",
+                "no extra commentary",
+            )
+            prompt_leak = (
+                any(marker in lowered for marker in prompt_leak_markers)
+                or compact in {"think", "thought", "reasoning", "analysis"}
+                or compact.startswith("think:")
+            )
         alpha_count = sum(1 for char in text if char.isalpha())
         punctuation_only = all(not char.isalnum() for char in text)
         unmatched_brackets = text.count("[") != text.count("]")
         malformed_unclear = lowered.startswith("[") and "unclear" not in lowered
-        tiny_token = len(text) <= 1 or (len(text) <= 3 and alpha_count < 2)
+        short_label_tokens = {
+            *{chr(code) for code in range(ord("A"), ord("Z") + 1)},
+            "DEL",
+            "SPACE",
+            "NOTHING",
+        }
+        looks_like_short_label = text.strip().upper() in short_label_tokens
+        tiny_token = not looks_like_short_label and (
+            len(text) <= 1 or (len(text) <= 3 and alpha_count < 2)
+        )
         unclear_prefix_token = (
             compact.startswith("unc")
             and len(compact) <= 8
@@ -413,8 +432,6 @@ class TranslationPipeline:
         if text == "[unclear]":
             confidence = min(confidence, 0.45)
         uncertain = confidence < self._settings.translation_uncertainty_threshold
-        if uncertain and "[unclear]" not in text.lower():
-            text = f"{text} [unclear]"
 
         return text, round(confidence, 4), uncertain
 

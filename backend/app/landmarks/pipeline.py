@@ -31,6 +31,7 @@ class LandmarkMetrics:
     last_processing_ms: float = 0.0
     last_result_at: str | None = None
     last_frame_id: int | None = None
+    last_frame_had_hands: bool = False
     last_error: str | None = None
     queue_size: int = 0
 
@@ -195,6 +196,7 @@ class LandmarkPipeline:
                 processed_at=processed_at,
                 processing_ms=round(processing_ms, 3),
                 hands=hands,
+                frame_payload=frame.payload,
             )
             self._recent_results.append(result)
 
@@ -205,6 +207,7 @@ class LandmarkPipeline:
                 self._metrics.last_frame_id = frame.frame_id
                 self._metrics.last_result_at = processed_at.isoformat()
                 self._metrics.last_processing_ms = round(processing_ms, 3)
+                self._metrics.last_frame_had_hands = bool(hands)
                 self._metrics.queue_size = self._queue.qsize()
                 self._metrics.healthy = True
                 self._metrics.last_error = None

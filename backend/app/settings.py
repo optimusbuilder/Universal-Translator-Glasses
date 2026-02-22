@@ -35,6 +35,17 @@ def load_env_file(env_path: Path) -> None:
         os.environ.setdefault(env_key, env_value)
 
 
+def _resolve_project_path(project_root: Path, raw_path: str | None) -> str | None:
+    if raw_path is None:
+        return None
+    candidate = Path(raw_path.strip()).expanduser()
+    if not raw_path.strip():
+        return None
+    if candidate.is_absolute():
+        return str(candidate)
+    return str((project_root / candidate).resolve())
+
+
 def _env_bool(key: str, default: bool) -> bool:
     value = os.getenv(key)
     if value is None:
@@ -232,7 +243,10 @@ def build_settings(project_root: Path) -> Settings:
         ),
         landmark_enabled=_env_bool("LANDMARK_ENABLED", True),
         landmark_mode=_env_mode("LANDMARK_MODE", "mediapipe", ("mediapipe",)),
-        mediapipe_hand_model_path=os.getenv("MEDIAPIPE_HAND_MODEL_PATH"),
+        mediapipe_hand_model_path=_resolve_project_path(
+            project_root,
+            os.getenv("MEDIAPIPE_HAND_MODEL_PATH"),
+        ),
         landmark_queue_maxsize=int(os.getenv("LANDMARK_QUEUE_MAXSIZE", "256")),
         landmark_recent_results_limit=int(os.getenv("LANDMARK_RECENT_RESULTS_LIMIT", "50")),
         windowing_enabled=_env_bool("WINDOWING_ENABLED", True),
@@ -265,9 +279,12 @@ def build_settings(project_root: Path) -> Settings:
             "TRANSLATION_EMIT_UNCLEAR_CAPTIONS",
             False,
         ),
-        local_classifier_model_path=os.getenv(
-            "LOCAL_CLASSIFIER_MODEL_PATH",
-            "backend/models/asl_landmark_classifier_v1.npz",
+        local_classifier_model_path=_resolve_project_path(
+            project_root,
+            os.getenv(
+                "LOCAL_CLASSIFIER_MODEL_PATH",
+                "backend/models/asl_landmark_classifier_v1.npz",
+            ),
         ),
         local_classifier_min_confidence=float(
             os.getenv("LOCAL_CLASSIFIER_MIN_CONFIDENCE", "0.55")

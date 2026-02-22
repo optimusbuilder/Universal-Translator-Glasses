@@ -40,28 +40,32 @@ class LocalClassifierTranslationProvider(TranslationProvider):
         total_weight = 0.0
 
         for frame in window.frames:
-            for hand in frame.hands:
-                if hand.confidence < self._settings.translation_hand_confidence_threshold:
-                    continue
+            if not frame.hands:
+                continue
 
-                feature = hand_to_feature(hand)
-                if feature is None:
-                    continue
+            # Use the highest-confidence hand per frame to reduce duplicate/noisy votes.
+            hand = max(frame.hands, key=lambda item: item.confidence)
+            if hand.confidence < self._settings.translation_hand_confidence_threshold:
+                continue
 
-                prediction = self._model.predict_feature(feature)
-                label = prediction.label.strip().upper()
-                if not label:
-                    continue
-                if self._allowlist and label not in self._allowlist:
-                    continue
+            feature = hand_to_feature(hand)
+            if feature is None:
+                continue
 
-                vote_weight = max(0.0, min(1.0, hand.confidence)) * prediction.confidence
-                if vote_weight <= 0:
-                    continue
+            prediction = self._model.predict_feature(feature)
+            label = prediction.label.strip().upper()
+            if not label:
+                continue
+            if self._allowlist and label not in self._allowlist:
+                continue
 
-                label_scores[label] += vote_weight
-                label_votes[label] += 1
-                total_weight += vote_weight
+            vote_weight = max(0.0, min(1.0, hand.confidence)) * prediction.confidence
+            if vote_weight <= 0:
+                continue
+
+            label_scores[label] += vote_weight
+            label_votes[label] += 1
+            total_weight += vote_weight
 
         if not label_scores:
             return TranslationPayload(text="UNCLEAR", confidence=0.2)

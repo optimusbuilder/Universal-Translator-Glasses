@@ -84,8 +84,10 @@ const normalizeMetricsEvent = (payload: Record<string, unknown>): StreamEvent =>
       toNumber(windowing.queue_size, 0) +
       toNumber(translation.queue_size, 0)
   );
-  const handsDetected =
-    toBool(landmark.healthy, false) && toNumber(landmark.frames_with_hands, 0) > 0;
+  const handsDetected = toBool(
+    landmark.last_frame_had_hands,
+    toBool(landmark.healthy, false) && toNumber(landmark.frames_with_hands, 0) > 0
+  );
 
   return {
     type: "system.metrics",

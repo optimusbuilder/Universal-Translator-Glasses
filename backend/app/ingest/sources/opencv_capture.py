@@ -71,6 +71,11 @@ class OpenCVCameraSource(CameraSource):
             capture.set(cv2.CAP_PROP_FRAME_WIDTH, float(self._width))
         if self._height > 0:
             capture.set(cv2.CAP_PROP_FRAME_HEIGHT, float(self._height))
+        # Keep latency low for OBS/virtual-camera streams by limiting internal buffering.
+        try:
+            capture.set(cv2.CAP_PROP_BUFFERSIZE, 1.0)
+        except Exception:
+            pass
 
         self._capture = capture
 

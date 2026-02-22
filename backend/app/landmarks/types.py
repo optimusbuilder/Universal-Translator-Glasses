@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import datetime
 
 
@@ -38,11 +38,14 @@ class LandmarkResult:
     processed_at: datetime
     processing_ms: float
     hands: list[HandLandmarks]
+    frame_payload: bytes | None = None
 
     def to_dict(self) -> dict[str, object]:
-        payload = asdict(self)
-        payload["captured_at"] = self.captured_at.isoformat()
-        payload["processed_at"] = self.processed_at.isoformat()
-        payload["hands"] = [hand.to_dict() for hand in self.hands]
-        return payload
-
+        return {
+            "frame_id": self.frame_id,
+            "source_name": self.source_name,
+            "captured_at": self.captured_at.isoformat(),
+            "processed_at": self.processed_at.isoformat(),
+            "processing_ms": self.processing_ms,
+            "hands": [hand.to_dict() for hand in self.hands],
+        }
