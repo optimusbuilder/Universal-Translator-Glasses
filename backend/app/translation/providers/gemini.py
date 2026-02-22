@@ -19,6 +19,7 @@ class GeminiTranslationProvider(TranslationProvider):
         if not settings.gemini_api_key:
             raise TranslationProviderError("GEMINI_API_KEY is required for gemini mode")
         self._settings = settings
+        self._model_name = settings.gemini_model.removeprefix("models/")
 
     @property
     def name(self) -> str:
@@ -28,9 +29,9 @@ class GeminiTranslationProvider(TranslationProvider):
         prompt = self._build_prompt(window)
         endpoint = (
             f"{self._settings.gemini_api_base_url}/models/"
-            f"{self._settings.gemini_model}:generateContent"
+            f"{self._model_name}:generateContent"
         )
-        params = {"key": self._settings.gemini_api_key}
+        headers = {"x-goog-api-key": self._settings.gemini_api_key}
         body = {
             "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {
@@ -42,7 +43,7 @@ class GeminiTranslationProvider(TranslationProvider):
         timeout = httpx.Timeout(self._settings.translation_timeout_seconds)
         try:
             async with httpx.AsyncClient(timeout=timeout) as client:
-                response = await client.post(endpoint, params=params, json=body)
+                response = await client.post(endpoint, headers=headers, json=body)
         except httpx.RequestError as exc:
             raise TranslationProviderError(f"gemini_request_error:{exc}") from exc
 
@@ -106,4 +107,3 @@ class GeminiTranslationProvider(TranslationProvider):
         if "[unclear]" in text.lower():
             return 0.45
         return 0.75
-

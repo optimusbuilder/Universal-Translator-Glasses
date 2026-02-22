@@ -11,7 +11,6 @@ from typing import Awaitable, Callable
 from backend.app.ingest.sources.base import FramePacket
 from backend.app.landmarks.extractors.base import HandLandmarkExtractor, LandmarkExtractorError
 from backend.app.landmarks.extractors.mediapipe import MediaPipeHandLandmarkExtractor
-from backend.app.landmarks.extractors.mock import MockHandLandmarkExtractor
 from backend.app.landmarks.types import LandmarkResult
 from backend.app.settings import Settings
 
@@ -165,17 +164,13 @@ class LandmarkPipeline:
         return [result.to_dict() for result in list(self._recent_results)[-bounded_limit:]][::-1]
 
     def _build_extractor(self, settings: Settings) -> HandLandmarkExtractor:
-        if settings.landmark_mode == "mock":
-            return MockHandLandmarkExtractor(
-                detection_rate=settings.mock_landmark_detection_rate,
-                delay_seconds=settings.mock_landmark_extraction_delay_seconds,
+        if settings.landmark_mode == "mediapipe":
+            return MediaPipeHandLandmarkExtractor(
+                model_path=settings.mediapipe_hand_model_path
             )
 
-        if settings.landmark_mode == "mediapipe":
-            return MediaPipeHandLandmarkExtractor()
-
         raise ValueError(
-            "unsupported landmark mode. Expected 'mock' or 'mediapipe'."
+            "unsupported landmark mode. Expected 'mediapipe'."
         )
 
     async def _run(self) -> None:

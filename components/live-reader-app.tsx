@@ -143,12 +143,24 @@ const StatusChip = ({ state }: StatusChipProps) => {
 };
 
 export const LiveReaderApp = () => {
-  const wsUrl = process.env.NEXT_PUBLIC_WS_URL;
+  const wsUrl = useMemo(() => {
+    const configured = process.env.NEXT_PUBLIC_WS_URL?.trim();
+    if (configured) {
+      return configured;
+    }
+
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+    return `${protocol}://${window.location.hostname}:8000/ws/events`;
+  }, []);
+
   const {
     alerts,
     connectionState,
     currentCaption,
-    demoMode,
     isProcessing,
     metrics,
     partialCaption,
@@ -156,7 +168,6 @@ export const LiveReaderApp = () => {
     transcript,
     clearTranscript,
     pauseSession,
-    setDemoMode,
     startSession
   } = useCaptionStream({ wsUrl });
 
@@ -193,7 +204,7 @@ export const LiveReaderApp = () => {
         <div className="titleBlock">
           <p className="eyebrow">ASL Live Reader</p>
           <h1>Universal Translator Glasses</h1>
-          <p className="sessionMeta">Session: Demo-01</p>
+          <p className="sessionMeta">Session: Live Stream</p>
         </div>
 
         <div className="statusBlock">
@@ -212,15 +223,6 @@ export const LiveReaderApp = () => {
           <button className="btn btnDanger" onClick={clearWithConfirm}>
             Clear
           </button>
-
-          <label className="toggleWrap">
-            <input
-              type="checkbox"
-              checked={demoMode}
-              onChange={(event) => setDemoMode(event.target.checked)}
-            />
-            <span>Demo Mode</span>
-          </label>
 
           <label className="toggleWrap">
             <input

@@ -42,6 +42,18 @@ def _env_bool(key: str, default: bool) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _env_mode(
+    key: str,
+    default: str,
+    allowed: tuple[str, ...],
+) -> str:
+    value = os.getenv(key, default).strip().lower()
+    if value not in allowed:
+        allowed_csv = ", ".join(allowed)
+        raise ValueError(f"{key} must be one of: {allowed_csv}")
+    return value
+
+
 @dataclass(frozen=True)
 class Settings:
     service_name: str
@@ -57,14 +69,11 @@ class Settings:
     esp32_frame_path: str
     esp32_request_timeout_seconds: float
     esp32_poll_interval_seconds: float
-    simulated_fps: float
-    simulated_disconnect_after_seconds: float
-    simulated_disconnect_duration_seconds: float
     landmark_enabled: bool
     landmark_mode: str
+    mediapipe_hand_model_path: str | None
     landmark_queue_maxsize: int
     landmark_recent_results_limit: int
-    mock_landmark_detection_rate: float
     windowing_enabled: bool
     window_duration_seconds: float
     window_slide_seconds: float
@@ -81,7 +90,6 @@ class Settings:
     gemini_model: str
     gemini_api_base_url: str
     gemini_api_key: str | None
-    mock_translation_delay_seconds: float = 0.0
     realtime_enabled: bool = True
     realtime_client_queue_maxsize: int = 128
     realtime_recent_events_limit: int = 200
@@ -91,12 +99,9 @@ class Settings:
     realtime_queue_depth_alert_threshold: int = 32
     landmark_adaptive_frame_skip_enabled: bool = True
     landmark_adaptive_skip_threshold: float = 0.75
-    mock_landmark_extraction_delay_seconds: float = 0.0
 
     @property
     def camera_source_configured(self) -> bool:
-        if self.camera_source_mode == "simulated":
-            return True
         return bool(self.camera_source_url)
 
     @property
@@ -118,14 +123,11 @@ class Settings:
             "esp32_frame_path": self.esp32_frame_path,
             "esp32_request_timeout_seconds": self.esp32_request_timeout_seconds,
             "esp32_poll_interval_seconds": self.esp32_poll_interval_seconds,
-            "simulated_fps": self.simulated_fps,
-            "simulated_disconnect_after_seconds": self.simulated_disconnect_after_seconds,
-            "simulated_disconnect_duration_seconds": self.simulated_disconnect_duration_seconds,
             "landmark_enabled": self.landmark_enabled,
             "landmark_mode": self.landmark_mode,
+            "mediapipe_hand_model_path_configured": bool(self.mediapipe_hand_model_path),
             "landmark_queue_maxsize": self.landmark_queue_maxsize,
             "landmark_recent_results_limit": self.landmark_recent_results_limit,
-            "mock_landmark_detection_rate": self.mock_landmark_detection_rate,
             "windowing_enabled": self.windowing_enabled,
             "window_duration_seconds": self.window_duration_seconds,
             "window_slide_seconds": self.window_slide_seconds,
@@ -139,7 +141,6 @@ class Settings:
             "translation_max_retries": self.translation_max_retries,
             "translation_retry_backoff_seconds": self.translation_retry_backoff_seconds,
             "translation_uncertainty_threshold": self.translation_uncertainty_threshold,
-            "mock_translation_delay_seconds": self.mock_translation_delay_seconds,
             "gemini_model": self.gemini_model,
             "gemini_api_base_url": self.gemini_api_base_url,
             "gemini_key_configured": self.gemini_key_configured,
@@ -152,7 +153,6 @@ class Settings:
             "realtime_queue_depth_alert_threshold": self.realtime_queue_depth_alert_threshold,
             "landmark_adaptive_frame_skip_enabled": self.landmark_adaptive_frame_skip_enabled,
             "landmark_adaptive_skip_threshold": self.landmark_adaptive_skip_threshold,
-            "mock_landmark_extraction_delay_seconds": self.mock_landmark_extraction_delay_seconds,
         }
 
 
@@ -167,7 +167,11 @@ def build_settings(project_root: Path) -> Settings:
         host=os.getenv("BACKEND_HOST", "127.0.0.1"),
         port=int(os.getenv("BACKEND_PORT", "8000")),
         ingest_enabled=_env_bool("INGEST_ENABLED", True),
-        camera_source_mode=os.getenv("CAMERA_SOURCE_MODE", "simulated").strip().lower(),
+        camera_source_mode=_env_mode(
+            "CAMERA_SOURCE_MODE",
+            "esp32_http",
+            ("esp32_http",),
+        ),
         camera_source_url=os.getenv("CAMERA_SOURCE_URL"),
         ingest_reconnect_backoff_seconds=float(
             os.getenv("INGEST_RECONNECT_BACKOFF_SECONDS", "1.0")
@@ -179,25 +183,18 @@ def build_settings(project_root: Path) -> Settings:
         esp32_poll_interval_seconds=float(
             os.getenv("ESP32_POLL_INTERVAL_SECONDS", "0.08")
         ),
-        simulated_fps=float(os.getenv("SIMULATED_SOURCE_FPS", "12.0")),
-        simulated_disconnect_after_seconds=float(
-            os.getenv("SIMULATED_DISCONNECT_AFTER_SECONDS", "-1.0")
-        ),
-        simulated_disconnect_duration_seconds=float(
-            os.getenv("SIMULATED_DISCONNECT_DURATION_SECONDS", "10.0")
-        ),
         landmark_enabled=_env_bool("LANDMARK_ENABLED", True),
-        landmark_mode=os.getenv("LANDMARK_MODE", "mock").strip().lower(),
+        landmark_mode=_env_mode("LANDMARK_MODE", "mediapipe", ("mediapipe",)),
+        mediapipe_hand_model_path=os.getenv("MEDIAPIPE_HAND_MODEL_PATH"),
         landmark_queue_maxsize=int(os.getenv("LANDMARK_QUEUE_MAXSIZE", "256")),
         landmark_recent_results_limit=int(os.getenv("LANDMARK_RECENT_RESULTS_LIMIT", "50")),
-        mock_landmark_detection_rate=float(os.getenv("MOCK_LANDMARK_DETECTION_RATE", "0.85")),
         windowing_enabled=_env_bool("WINDOWING_ENABLED", True),
         window_duration_seconds=float(os.getenv("WINDOW_DURATION_SECONDS", "1.5")),
         window_slide_seconds=float(os.getenv("WINDOW_SLIDE_SECONDS", "0.5")),
         window_queue_maxsize=int(os.getenv("WINDOW_QUEUE_MAXSIZE", "128")),
         window_recent_results_limit=int(os.getenv("WINDOW_RECENT_RESULTS_LIMIT", "40")),
         translation_enabled=_env_bool("TRANSLATION_ENABLED", True),
-        translation_mode=os.getenv("TRANSLATION_MODE", "mock").strip().lower(),
+        translation_mode=_env_mode("TRANSLATION_MODE", "gemini", ("gemini",)),
         translation_queue_maxsize=int(os.getenv("TRANSLATION_QUEUE_MAXSIZE", "128")),
         translation_recent_results_limit=int(
             os.getenv("TRANSLATION_RECENT_RESULTS_LIMIT", "80")
@@ -210,10 +207,7 @@ def build_settings(project_root: Path) -> Settings:
         translation_uncertainty_threshold=float(
             os.getenv("TRANSLATION_UNCERTAINTY_THRESHOLD", "0.6")
         ),
-        mock_translation_delay_seconds=float(
-            os.getenv("MOCK_TRANSLATION_DELAY_SECONDS", "0.0")
-        ),
-        gemini_model=os.getenv("GEMINI_MODEL", "gemini-1.5-flash"),
+        gemini_model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
         gemini_api_base_url=os.getenv(
             "GEMINI_API_BASE_URL",
             "https://generativelanguage.googleapis.com/v1beta",
@@ -241,8 +235,5 @@ def build_settings(project_root: Path) -> Settings:
         ),
         landmark_adaptive_skip_threshold=float(
             os.getenv("LANDMARK_ADAPTIVE_SKIP_THRESHOLD", "0.75")
-        ),
-        mock_landmark_extraction_delay_seconds=float(
-            os.getenv("MOCK_LANDMARK_EXTRACTION_DELAY_SECONDS", "0.0")
         ),
     )

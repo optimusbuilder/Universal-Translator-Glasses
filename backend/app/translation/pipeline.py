@@ -14,7 +14,6 @@ from backend.app.translation.providers.base import (
     TranslationProviderError,
 )
 from backend.app.translation.providers.gemini import GeminiTranslationProvider
-from backend.app.translation.providers.mock import MockTranslationProvider
 from backend.app.translation.types import TranslationPayload, TranslationResult
 from backend.app.windowing.types import LandmarkWindow
 
@@ -155,15 +154,10 @@ class TranslationPipeline:
         return [item.to_dict() for item in list(self._recent_results)[-bounded:]][::-1]
 
     def _build_provider(self, settings: Settings) -> TranslationProvider:
-        if settings.translation_mode == "mock":
-            return MockTranslationProvider(
-                delay_seconds=settings.mock_translation_delay_seconds
-            )
-
         if settings.translation_mode == "gemini":
             return GeminiTranslationProvider(settings=settings)
 
-        raise ValueError("unsupported translation mode. Expected 'mock' or 'gemini'.")
+        raise ValueError("unsupported translation mode. Expected 'gemini'.")
 
     async def _run(self) -> None:
         while not self._stopping:

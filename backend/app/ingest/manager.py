@@ -15,7 +15,6 @@ from backend.app.ingest.sources.base import (
     FramePacket,
 )
 from backend.app.ingest.sources.esp32_http import ESP32HttpCameraSource
-from backend.app.ingest.sources.simulated import SimulatedCameraSource
 from backend.app.settings import Settings
 
 
@@ -103,14 +102,6 @@ class IngestManager:
         return metrics
 
     def _build_source_factory(self, settings: Settings) -> Callable[[], CameraSource]:
-        if settings.camera_source_mode == "simulated":
-            source = SimulatedCameraSource(
-                fps=settings.simulated_fps,
-                disconnect_after_seconds=settings.simulated_disconnect_after_seconds,
-                disconnect_duration_seconds=settings.simulated_disconnect_duration_seconds,
-            )
-            return lambda: source
-
         if settings.camera_source_mode == "esp32_http":
             if not settings.camera_source_url:
                 raise ValueError(
@@ -125,7 +116,7 @@ class IngestManager:
             )
 
         raise ValueError(
-            "unsupported camera source mode. Expected 'simulated' or 'esp32_http'."
+            "unsupported camera source mode. Expected 'esp32_http'."
         )
 
     async def _run(self) -> None:
