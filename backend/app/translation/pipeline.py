@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from collections import deque
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -278,11 +279,45 @@ class TranslationPipeline:
     def _normalize_translation(self, payload: TranslationPayload) -> tuple[str, float, bool]:
         text = (payload.text or "").strip()
         text = text.replace("`", "").replace('"', "").strip()
+        text = re.sub(r"\s+", " ", text)
         if not text:
             text = "[unclear]"
 
         lowered = text.lower()
-        if lowered.startswith("[un") or "unclear" in lowered:
+        compact = lowered.strip("[](){}:;,.!? ").strip()
+        prompt_leak_markers = (
+            "think ",
+            "window metadata",
+            "frames json",
+            "asl hand-landmark",
+            "return exactly one line",
+            "do not use brackets",
+            "if uncertain",
+            "translate asl",
+            "no extra commentary",
+        )
+        prompt_leak = any(marker in lowered for marker in prompt_leak_markers)
+        alpha_count = sum(1 for char in text if char.isalpha())
+        punctuation_only = all(not char.isalnum() for char in text)
+        unmatched_brackets = text.count("[") != text.count("]")
+        malformed_unclear = lowered.startswith("[") and "unclear" not in lowered
+        tiny_token = len(text) <= 1 or (len(text) <= 3 and alpha_count < 2)
+        unclear_prefix_token = (
+            compact.startswith("unc")
+            and len(compact) <= 8
+            and " " not in compact
+        )
+
+        if (
+            prompt_leak
+            "unclear" in lowered
+            or unclear_prefix_token
+            or lowered in {"unknown", "n/a", "na"}
+            or punctuation_only
+            or unmatched_brackets
+            or malformed_unclear
+            or tiny_token
+        ):
             text = "[unclear]"
 
         confidence = max(0.0, min(1.0, float(payload.confidence)))
