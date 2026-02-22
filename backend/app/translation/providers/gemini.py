@@ -35,8 +35,8 @@ class GeminiTranslationProvider(TranslationProvider):
         body = {
             "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {
-                "temperature": 0.2,
-                "maxOutputTokens": 120,
+                "temperature": 0.1,
+                "maxOutputTokens": 64,
             },
         }
 
@@ -61,26 +61,40 @@ class GeminiTranslationProvider(TranslationProvider):
     def _build_prompt(self, window: LandmarkWindow) -> str:
         frame_summary: list[dict[str, Any]] = []
         for frame in window.frames:
+            if not frame.hands:
+                continue
             hands = [
                 {
                     "handedness": hand.handedness,
-                    "confidence": hand.confidence,
-                    "landmarks": [point.to_dict() for point in hand.landmarks],
+                    "confidence": round(hand.confidence, 3),
+                    "landmarks": [
+                        [
+                            round(point.x, 4),
+                            round(point.y, 4),
+                            round(point.z, 4),
+                        ]
+                        for point in hand.landmarks
+                    ],
                 }
                 for hand in frame.hands
             ]
             frame_summary.append(
                 {
                     "frame_id": frame.frame_id,
-                    "captured_at": frame.captured_at.isoformat(),
                     "hands": hands,
                 }
             )
 
+        if not frame_summary:
+            return (
+                "No reliable hand landmarks detected in this window. "
+                "Return exactly: [unclear]"
+            )
+
         return (
-            "You are translating ASL hand-landmark sequences to plain English.\n"
-            "Return only the best concise English translation.\n"
-            "If uncertain, include '[unclear]'.\n"
+            "You translate ASL hand-landmark sequences to short plain English.\n"
+            "Return exactly one line and no extra commentary.\n"
+            "If the sign is ambiguous, return exactly: [unclear]\n"
             f"Window metadata: id={window.window_id}, frame_count={window.frame_count}\n"
             f"Frames JSON: {json.dumps(frame_summary, separators=(',', ':'))}"
         )
@@ -104,6 +118,6 @@ class GeminiTranslationProvider(TranslationProvider):
         return " ".join(segment.strip() for segment in segments if segment.strip()).strip()
 
     def _estimate_confidence(self, text: str) -> float:
-        if "[unclear]" in text.lower():
+        if "unclear" in text.lower():
             return 0.45
         return 0.75

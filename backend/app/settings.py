@@ -87,6 +87,8 @@ class Settings:
     translation_max_retries: int
     translation_retry_backoff_seconds: float
     translation_uncertainty_threshold: float
+    translation_min_frames_with_hands: int
+    translation_emit_unclear_captions: bool
     gemini_model: str
     gemini_api_base_url: str
     gemini_api_key: str | None
@@ -141,6 +143,8 @@ class Settings:
             "translation_max_retries": self.translation_max_retries,
             "translation_retry_backoff_seconds": self.translation_retry_backoff_seconds,
             "translation_uncertainty_threshold": self.translation_uncertainty_threshold,
+            "translation_min_frames_with_hands": self.translation_min_frames_with_hands,
+            "translation_emit_unclear_captions": self.translation_emit_unclear_captions,
             "gemini_model": self.gemini_model,
             "gemini_api_base_url": self.gemini_api_base_url,
             "gemini_key_configured": self.gemini_key_configured,
@@ -206,6 +210,13 @@ def build_settings(project_root: Path) -> Settings:
         ),
         translation_uncertainty_threshold=float(
             os.getenv("TRANSLATION_UNCERTAINTY_THRESHOLD", "0.6")
+        ),
+        translation_min_frames_with_hands=int(
+            os.getenv("TRANSLATION_MIN_FRAMES_WITH_HANDS", "1")
+        ),
+        translation_emit_unclear_captions=_env_bool(
+            "TRANSLATION_EMIT_UNCLEAR_CAPTIONS",
+            False,
         ),
         gemini_model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
         gemini_api_base_url=os.getenv(

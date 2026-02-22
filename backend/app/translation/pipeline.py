@@ -27,6 +27,8 @@ class TranslationMetrics:
     healthy: bool = False
     windows_enqueued: int = 0
     queue_drops: int = 0
+    windows_skipped_low_signal: int = 0
+    windows_suppressed_unclear: int = 0
     windows_processed: int = 0
     partial_emitted: int = 0
     final_emitted: int = 0
@@ -168,6 +170,15 @@ class TranslationPipeline:
                 self._queue.task_done()
 
     async def _process_window(self, window: LandmarkWindow) -> None:
+        frames_with_hands = sum(1 for frame in window.frames if frame.hands)
+        if frames_with_hands < max(1, self._settings.translation_min_frames_with_hands):
+            async with self._lock:
+                self._metrics.windows_skipped_low_signal += 1
+                self._metrics.queue_size = self._queue.qsize()
+                self._metrics.healthy = True
+                self._metrics.last_error = None
+            return
+
         started = monotonic()
         payload: TranslationPayload | None = None
         retry_count = 0
@@ -194,6 +205,13 @@ class TranslationPipeline:
                 self._metrics.healthy = False
 
         final_text, final_conf, uncertain = self._normalize_translation(payload)
+        if final_text == "[unclear]" and not self._settings.translation_emit_unclear_captions:
+            async with self._lock:
+                self._metrics.windows_suppressed_unclear += 1
+                self._metrics.queue_size = self._queue.qsize()
+                self._metrics.healthy = True
+            return
+
         partial_text = self._build_partial_text(final_text)
         processed_at = datetime.now(timezone.utc)
         latency_ms = round((monotonic() - started) * 1000.0, 3)
@@ -259,10 +277,17 @@ class TranslationPipeline:
 
     def _normalize_translation(self, payload: TranslationPayload) -> tuple[str, float, bool]:
         text = (payload.text or "").strip()
+        text = text.replace("`", "").replace('"', "").strip()
         if not text:
             text = "[unclear]"
 
+        lowered = text.lower()
+        if lowered.startswith("[un") or "unclear" in lowered:
+            text = "[unclear]"
+
         confidence = max(0.0, min(1.0, float(payload.confidence)))
+        if text == "[unclear]":
+            confidence = min(confidence, 0.45)
         uncertain = confidence < self._settings.translation_uncertainty_threshold
         if uncertain and "[unclear]" not in text.lower():
             text = f"{text} [unclear]"
