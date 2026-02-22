@@ -277,4 +277,44 @@ class RealtimeEventManager:
                     }
                 )
 
+        translation_snapshot = metrics_payload.get("translation") or {}
+        translation_enabled = bool(translation_snapshot.get("translation_enabled", True))
+        translation_running = bool(translation_snapshot.get("running", False))
+        translation_latency = float(
+            translation_snapshot.get("last_processing_ms", 0.0) or 0.0
+        )
+        if (
+            translation_enabled
+            and translation_running
+            and translation_latency >= self._settings.realtime_translation_latency_alert_ms
+        ):
+            alerts.append(
+                {
+                    "key": "translation:latency_high",
+                    "severity": "warning",
+                    "component": "translation",
+                    "reason": (
+                        "high_translation_latency:"
+                        f"{round(translation_latency, 2)}ms"
+                    ),
+                }
+            )
+
+        landmark_snapshot = metrics_payload.get("landmark") or {}
+        windowing_snapshot = metrics_payload.get("windowing") or {}
+        total_queue_depth = (
+            int(landmark_snapshot.get("queue_size", 0) or 0)
+            + int(windowing_snapshot.get("queue_size", 0) or 0)
+            + int(translation_snapshot.get("queue_size", 0) or 0)
+        )
+        if total_queue_depth >= self._settings.realtime_queue_depth_alert_threshold:
+            alerts.append(
+                {
+                    "key": "system:queue_depth_high",
+                    "severity": "warning",
+                    "component": "system",
+                    "reason": f"queue_depth_high:{total_queue_depth}",
+                }
+            )
+
         return alerts

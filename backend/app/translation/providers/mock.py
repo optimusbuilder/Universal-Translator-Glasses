@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 
 from backend.app.translation.providers.base import TranslationProvider
@@ -18,11 +19,17 @@ MOCK_PHRASES = [
 
 
 class MockTranslationProvider(TranslationProvider):
+    def __init__(self, delay_seconds: float = 0.0) -> None:
+        self._delay_seconds = max(0.0, delay_seconds)
+
     @property
     def name(self) -> str:
         return "mock-translation-provider"
 
     async def translate(self, window: LandmarkWindow) -> TranslationPayload:
+        if self._delay_seconds > 0:
+            await asyncio.sleep(self._delay_seconds)
+
         confidence_values: list[float] = []
         for frame in window.frames:
             for hand in frame.hands:
@@ -37,4 +44,3 @@ class MockTranslationProvider(TranslationProvider):
             text = f"{text} [unclear]"
 
         return TranslationPayload(text=text, confidence=round(avg_conf, 4))
-

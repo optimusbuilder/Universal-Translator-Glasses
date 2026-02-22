@@ -25,6 +25,7 @@ class LandmarkMetrics:
     healthy: bool = False
     frames_enqueued: int = 0
     queue_drops: int = 0
+    adaptive_skips: int = 0
     frames_processed: int = 0
     frames_with_hands: int = 0
     average_processing_ms: float = 0.0
@@ -128,6 +129,16 @@ class LandmarkPipeline:
         if not self._settings.landmark_enabled:
             return
 
+        if self._settings.landmark_adaptive_frame_skip_enabled:
+            queue_maxsize = max(1, self._queue.maxsize)
+            queue_utilization = self._queue.qsize() / queue_maxsize
+            if queue_utilization >= self._settings.landmark_adaptive_skip_threshold:
+                async with self._lock:
+                    self._metrics.adaptive_skips += 1
+                    self._metrics.queue_size = self._queue.qsize()
+                    self._metrics.last_error = "adaptive_frame_skip"
+                return
+
         try:
             self._queue.put_nowait(frame)
         except asyncio.QueueFull:
@@ -156,7 +167,8 @@ class LandmarkPipeline:
     def _build_extractor(self, settings: Settings) -> HandLandmarkExtractor:
         if settings.landmark_mode == "mock":
             return MockHandLandmarkExtractor(
-                detection_rate=settings.mock_landmark_detection_rate
+                detection_rate=settings.mock_landmark_detection_rate,
+                delay_seconds=settings.mock_landmark_extraction_delay_seconds,
             )
 
         if settings.landmark_mode == "mediapipe":

@@ -46,6 +46,139 @@ const alertFromPayload = (payload: AlertPayload): AlertEntry => ({
   id: crypto.randomUUID()
 });
 
+type BackendEventEnvelope = {
+  event: string;
+  timestamp?: string;
+  payload?: Record<string, unknown>;
+};
+
+const isObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const toNumber = (value: unknown, fallback = 0): number => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return fallback;
+};
+
+const toString = (value: unknown, fallback = ""): string =>
+  typeof value === "string" ? value : fallback;
+
+const toBool = (value: unknown, fallback = false): boolean =>
+  typeof value === "boolean" ? value : fallback;
+
+const normalizeMetricsEvent = (payload: Record<string, unknown>): StreamEvent => {
+  const ingest = isObject(payload.ingest) ? payload.ingest : {};
+  const landmark = isObject(payload.landmark) ? payload.landmark : {};
+  const windowing = isObject(payload.windowing) ? payload.windowing : {};
+  const translation = isObject(payload.translation) ? payload.translation : {};
+
+  const fps = Math.max(0, toNumber(ingest.effective_fps, 0));
+  const latencyMs = Math.max(
+    0,
+    toNumber(translation.last_processing_ms, toNumber(landmark.last_processing_ms, 0))
+  );
+  const queueDepth = Math.max(
+    0,
+    toNumber(landmark.queue_size, 0) +
+      toNumber(windowing.queue_size, 0) +
+      toNumber(translation.queue_size, 0)
+  );
+  const handsDetected =
+    toBool(landmark.healthy, false) && toNumber(landmark.frames_with_hands, 0) > 0;
+
+  return {
+    type: "system.metrics",
+    payload: {
+      fps: Math.round(fps),
+      latency_ms: Math.round(latencyMs),
+      hands_detected: handsDetected,
+      queue_depth: Math.round(queueDepth)
+    }
+  };
+};
+
+const normalizeAlertEvent = (
+  envelopeTimestamp: string,
+  payload: Record<string, unknown>
+): StreamEvent => {
+  const severity = toString(payload.severity, "info").toLowerCase();
+  const component = toString(payload.component, "system");
+  const reason = toString(payload.reason, "unknown alert");
+  const level: AlertPayload["level"] =
+    severity === "error" ? "error" : severity === "warning" ? "warning" : "info";
+
+  return {
+    type: "system.alert",
+    payload: {
+      level,
+      message: `${component}: ${reason}`,
+      timestamp: toString(payload.timestamp, envelopeTimestamp)
+    }
+  };
+};
+
+const normalizeCaptionEvent = (
+  eventType: "caption.partial" | "caption.final",
+  envelopeTimestamp: string,
+  payload: Record<string, unknown>
+): StreamEvent => {
+  return {
+    type: eventType,
+    payload: {
+      text: toString(payload.text, ""),
+      timestamp: toString(payload.created_at, envelopeTimestamp),
+      confidence: Math.max(0, Math.min(1, toNumber(payload.confidence, 0)))
+    }
+  };
+};
+
+const normalizeIncomingEvent = (raw: unknown): StreamEvent | null => {
+  if (!isObject(raw)) {
+    return null;
+  }
+
+  if (typeof raw.type === "string" && isObject(raw.payload)) {
+    const eventType = raw.type;
+    const payload = raw.payload;
+    if (eventType === "caption.partial" || eventType === "caption.final") {
+      return normalizeCaptionEvent(eventType, nowIso(), payload);
+    }
+    if (eventType === "system.metrics") {
+      return normalizeMetricsEvent(payload);
+    }
+    if (eventType === "system.alert") {
+      return normalizeAlertEvent(nowIso(), payload);
+    }
+    return null;
+  }
+
+  const envelope = raw as BackendEventEnvelope;
+  if (typeof envelope.event !== "string" || !isObject(envelope.payload)) {
+    return null;
+  }
+
+  const envelopeTimestamp = toString(envelope.timestamp, nowIso());
+  if (envelope.event === "caption.partial" || envelope.event === "caption.final") {
+    return normalizeCaptionEvent(envelope.event, envelopeTimestamp, envelope.payload);
+  }
+  if (envelope.event === "system.metrics") {
+    return normalizeMetricsEvent(envelope.payload);
+  }
+  if (envelope.event === "system.alert") {
+    return normalizeAlertEvent(envelopeTimestamp, envelope.payload);
+  }
+
+  return null;
+};
+
 type UseCaptionStreamArgs = {
   wsUrl?: string;
 };
@@ -245,11 +378,12 @@ export const useCaptionStream = ({ wsUrl }: UseCaptionStreamArgs): UseCaptionStr
 
       ws.onmessage = (event) => {
         try {
-          const parsed = JSON.parse(String(event.data)) as StreamEvent;
-          if (!parsed || typeof parsed.type !== "string") {
+          const parsed = JSON.parse(String(event.data));
+          const normalized = normalizeIncomingEvent(parsed);
+          if (!normalized) {
             return;
           }
-          handleEvent(parsed);
+          handleEvent(normalized);
         } catch {
           addAlert({
             level: "warning",

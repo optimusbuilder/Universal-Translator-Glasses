@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import random
 import zlib
 
@@ -11,14 +12,18 @@ from backend.app.landmarks.types import HandLandmarks, LandmarkPoint
 class MockHandLandmarkExtractor(HandLandmarkExtractor):
     """Deterministic pseudo-landmarks for non-hardware/non-mediapipe testing."""
 
-    def __init__(self, detection_rate: float = 0.85) -> None:
+    def __init__(self, detection_rate: float = 0.85, delay_seconds: float = 0.0) -> None:
         self._detection_rate = max(0.0, min(1.0, detection_rate))
+        self._delay_seconds = max(0.0, delay_seconds)
 
     @property
     def name(self) -> str:
         return "mock-hands-extractor"
 
     async def extract(self, frame: FramePacket) -> list[HandLandmarks]:
+        if self._delay_seconds > 0:
+            await asyncio.sleep(self._delay_seconds)
+
         seed = zlib.crc32(frame.payload) ^ frame.frame_id
         rng = random.Random(seed)
 
@@ -48,4 +53,3 @@ class MockHandLandmarkExtractor(HandLandmarkExtractor):
             )
 
         return hands
-

@@ -372,5 +372,11 @@ Current state:
 12. Phase 4 tests pass (`P4-Window-Integrity-Test` and window API contract test).
 13. Phase 5 translation pipeline scaffold implemented with mock/gemini providers + retry policy.
 14. Phase 5 tests pass (`P5-Translation-Contract-Test` and translation API contract test).
+15. Phase 6 websocket event layer implemented with per-client buffering and lifecycle-safe disconnect handling.
+16. Phase 6 tests pass (`P6-WebSocket-Delivery-Test` and realtime API contract test).
+17. Phase 7 reliability hardening implemented with adaptive frame skipping and latency/queue fault alerts.
+18. Phase 7 test passes (`P7-Fault-Injection-Test`).
+19. Phase 8 end-to-end certification run implemented with KPI gate assertions and repeatability check.
+20. Phase 8 test passes (`P8-Demo-Certification-Run`).
 
 This document is intentionally implementation-first planning only and includes no backend code.

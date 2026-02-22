@@ -1,4 +1,4 @@
-# Backend Setup (Phase 1 + Phase 2A + Phase 2B Dry-Run + Phase 3 + Phase 4 + Phase 5 + Phase 6)
+# Backend Setup (Phase 1 + Phase 2A + Phase 2B Dry-Run + Phase 3 + Phase 4 + Phase 5 + Phase 6 + Phase 7 + Phase 8)
 
 This backend currently implements:
 
@@ -9,6 +9,8 @@ This backend currently implements:
 5. Phase 4: temporal windowing pipeline over landmark results with window status endpoints.
 6. Phase 5: translation orchestration over windows with retry/timeout policy and partial/final outputs.
 7. Phase 6: realtime WebSocket broadcast layer for caption and system events.
+8. Phase 7: reliability hardening with adaptive frame skipping and fault/overload alerting.
+9. Phase 8: end-to-end demo certification run with KPI gate verification.
 
 ## Implemented Endpoints
 
@@ -67,6 +69,8 @@ This backend currently implements:
 11. `backend/tests/test_phase5_translation_api.py`: Phase 5 translation API contract test.
 12. `backend/tests/test_phase6_websocket_delivery.py`: Phase 6 websocket delivery completion test.
 13. `backend/tests/test_phase6_realtime_api.py`: Phase 6 realtime API contract test.
+14. `backend/tests/test_phase7_fault_injection.py`: Phase 7 fault injection completion test.
+15. `backend/tests/test_phase8_demo_certification.py`: Phase 8 demo certification completion test.
 
 ## Install
 
@@ -185,6 +189,28 @@ Realtime API contract test:
 PYTHONPATH=. .venv/bin/python -m unittest backend.tests.test_phase6_realtime_api
 ```
 
+## Phase 7 Test (`P7-Fault-Injection-Test`)
+
+Fault injection completion test:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m unittest backend.tests.test_phase7_fault_injection
+```
+
+## Phase 8 Test (`P8-Demo-Certification-Run`)
+
+Demo certification run (short default CI/local duration):
+
+```bash
+PYTHONPATH=. .venv/bin/python -m unittest backend.tests.test_phase8_demo_certification
+```
+
+Long-form certification run (10 minutes + repeatability check):
+
+```bash
+PHASE8_RUN_DURATION_SECONDS=600 PHASE8_REPEAT_DURATION_SECONDS=120 PYTHONPATH=. .venv/bin/python -m unittest backend.tests.test_phase8_demo_certification
+```
+
 ## Optional Manual ESP32 Mock Server
 
 Run a local mock ESP32 frame server:
@@ -217,26 +243,32 @@ CAMERA_SOURCE_MODE=esp32_http CAMERA_SOURCE_URL=http://127.0.0.1:8090 ESP32_FRAM
 14. `LANDMARK_QUEUE_MAXSIZE` (default `256`)
 15. `LANDMARK_RECENT_RESULTS_LIMIT` (default `50`)
 16. `MOCK_LANDMARK_DETECTION_RATE` (default `0.85`)
-17. `WINDOWING_ENABLED` (default `true`)
-18. `WINDOW_DURATION_SECONDS` (default `1.5`)
-19. `WINDOW_SLIDE_SECONDS` (default `0.5`)
-20. `WINDOW_QUEUE_MAXSIZE` (default `128`)
-21. `WINDOW_RECENT_RESULTS_LIMIT` (default `40`)
-22. `TRANSLATION_ENABLED` (default `true`)
-23. `TRANSLATION_MODE` (default `mock`)
-24. `TRANSLATION_QUEUE_MAXSIZE` (default `128`)
-25. `TRANSLATION_RECENT_RESULTS_LIMIT` (default `80`)
-26. `TRANSLATION_TIMEOUT_SECONDS` (default `4.0`)
-27. `TRANSLATION_MAX_RETRIES` (default `2`)
-28. `TRANSLATION_RETRY_BACKOFF_SECONDS` (default `0.25`)
-29. `TRANSLATION_UNCERTAINTY_THRESHOLD` (default `0.6`)
-30. `GEMINI_MODEL` (default `gemini-1.5-flash`)
-31. `GEMINI_API_BASE_URL` (default `https://generativelanguage.googleapis.com/v1beta`)
-32. `REALTIME_ENABLED` (default `true`)
-33. `REALTIME_CLIENT_QUEUE_MAXSIZE` (default `128`)
-34. `REALTIME_RECENT_EVENTS_LIMIT` (default `200`)
-35. `REALTIME_METRICS_INTERVAL_SECONDS` (default `1.0`)
-36. `REALTIME_ALERT_COOLDOWN_SECONDS` (default `3.0`)
+17. `MOCK_LANDMARK_EXTRACTION_DELAY_SECONDS` (default `0.0`)
+18. `WINDOWING_ENABLED` (default `true`)
+19. `WINDOW_DURATION_SECONDS` (default `1.5`)
+20. `WINDOW_SLIDE_SECONDS` (default `0.5`)
+21. `WINDOW_QUEUE_MAXSIZE` (default `128`)
+22. `WINDOW_RECENT_RESULTS_LIMIT` (default `40`)
+23. `TRANSLATION_ENABLED` (default `true`)
+24. `TRANSLATION_MODE` (default `mock`)
+25. `TRANSLATION_QUEUE_MAXSIZE` (default `128`)
+26. `TRANSLATION_RECENT_RESULTS_LIMIT` (default `80`)
+27. `TRANSLATION_TIMEOUT_SECONDS` (default `4.0`)
+28. `TRANSLATION_MAX_RETRIES` (default `2`)
+29. `TRANSLATION_RETRY_BACKOFF_SECONDS` (default `0.25`)
+30. `TRANSLATION_UNCERTAINTY_THRESHOLD` (default `0.6`)
+31. `GEMINI_MODEL` (default `gemini-1.5-flash`)
+32. `GEMINI_API_BASE_URL` (default `https://generativelanguage.googleapis.com/v1beta`)
+33. `REALTIME_ENABLED` (default `true`)
+34. `REALTIME_CLIENT_QUEUE_MAXSIZE` (default `128`)
+35. `REALTIME_RECENT_EVENTS_LIMIT` (default `200`)
+36. `REALTIME_METRICS_INTERVAL_SECONDS` (default `1.0`)
+37. `REALTIME_ALERT_COOLDOWN_SECONDS` (default `3.0`)
+38. `MOCK_TRANSLATION_DELAY_SECONDS` (default `0.0`)
+39. `REALTIME_TRANSLATION_LATENCY_ALERT_MS` (default `2500.0`)
+40. `REALTIME_QUEUE_DEPTH_ALERT_THRESHOLD` (default `32`)
+41. `LANDMARK_ADAPTIVE_FRAME_SKIP_ENABLED` (default `true`)
+42. `LANDMARK_ADAPTIVE_SKIP_THRESHOLD` (default `0.75`)
 
 ## Notes
 
@@ -246,3 +278,5 @@ CAMERA_SOURCE_MODE=esp32_http CAMERA_SOURCE_URL=http://127.0.0.1:8090 ESP32_FRAM
 4. Phase 4 windows currently feed inspection endpoints and are ready for Phase 5 translation integration.
 5. For Phase 5, keep `TRANSLATION_MODE=mock` for local validation; switch to `gemini` for real model calls.
 6. Phase 6 now publishes realtime websocket events from translation output and periodic health snapshots.
+7. Phase 7 adds adaptive landmark frame skipping and alert rules for latency/queue pressure.
+8. Phase 8 validates end-to-end readiness with automated KPI gates and restart-free recovery checks.

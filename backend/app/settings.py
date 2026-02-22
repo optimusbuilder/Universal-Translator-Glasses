@@ -81,11 +81,17 @@ class Settings:
     gemini_model: str
     gemini_api_base_url: str
     gemini_api_key: str | None
+    mock_translation_delay_seconds: float = 0.0
     realtime_enabled: bool = True
     realtime_client_queue_maxsize: int = 128
     realtime_recent_events_limit: int = 200
     realtime_metrics_interval_seconds: float = 1.0
     realtime_alert_cooldown_seconds: float = 3.0
+    realtime_translation_latency_alert_ms: float = 2500.0
+    realtime_queue_depth_alert_threshold: int = 32
+    landmark_adaptive_frame_skip_enabled: bool = True
+    landmark_adaptive_skip_threshold: float = 0.75
+    mock_landmark_extraction_delay_seconds: float = 0.0
 
     @property
     def camera_source_configured(self) -> bool:
@@ -133,6 +139,7 @@ class Settings:
             "translation_max_retries": self.translation_max_retries,
             "translation_retry_backoff_seconds": self.translation_retry_backoff_seconds,
             "translation_uncertainty_threshold": self.translation_uncertainty_threshold,
+            "mock_translation_delay_seconds": self.mock_translation_delay_seconds,
             "gemini_model": self.gemini_model,
             "gemini_api_base_url": self.gemini_api_base_url,
             "gemini_key_configured": self.gemini_key_configured,
@@ -141,6 +148,11 @@ class Settings:
             "realtime_recent_events_limit": self.realtime_recent_events_limit,
             "realtime_metrics_interval_seconds": self.realtime_metrics_interval_seconds,
             "realtime_alert_cooldown_seconds": self.realtime_alert_cooldown_seconds,
+            "realtime_translation_latency_alert_ms": self.realtime_translation_latency_alert_ms,
+            "realtime_queue_depth_alert_threshold": self.realtime_queue_depth_alert_threshold,
+            "landmark_adaptive_frame_skip_enabled": self.landmark_adaptive_frame_skip_enabled,
+            "landmark_adaptive_skip_threshold": self.landmark_adaptive_skip_threshold,
+            "mock_landmark_extraction_delay_seconds": self.mock_landmark_extraction_delay_seconds,
         }
 
 
@@ -198,6 +210,9 @@ def build_settings(project_root: Path) -> Settings:
         translation_uncertainty_threshold=float(
             os.getenv("TRANSLATION_UNCERTAINTY_THRESHOLD", "0.6")
         ),
+        mock_translation_delay_seconds=float(
+            os.getenv("MOCK_TRANSLATION_DELAY_SECONDS", "0.0")
+        ),
         gemini_model=os.getenv("GEMINI_MODEL", "gemini-1.5-flash"),
         gemini_api_base_url=os.getenv(
             "GEMINI_API_BASE_URL",
@@ -214,5 +229,20 @@ def build_settings(project_root: Path) -> Settings:
         ),
         realtime_alert_cooldown_seconds=float(
             os.getenv("REALTIME_ALERT_COOLDOWN_SECONDS", "3.0")
+        ),
+        realtime_translation_latency_alert_ms=float(
+            os.getenv("REALTIME_TRANSLATION_LATENCY_ALERT_MS", "2500.0")
+        ),
+        realtime_queue_depth_alert_threshold=int(
+            os.getenv("REALTIME_QUEUE_DEPTH_ALERT_THRESHOLD", "32")
+        ),
+        landmark_adaptive_frame_skip_enabled=_env_bool(
+            "LANDMARK_ADAPTIVE_FRAME_SKIP_ENABLED", True
+        ),
+        landmark_adaptive_skip_threshold=float(
+            os.getenv("LANDMARK_ADAPTIVE_SKIP_THRESHOLD", "0.75")
+        ),
+        mock_landmark_extraction_delay_seconds=float(
+            os.getenv("MOCK_LANDMARK_EXTRACTION_DELAY_SECONDS", "0.0")
         ),
     )

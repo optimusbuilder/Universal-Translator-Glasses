@@ -156,7 +156,9 @@ class TranslationPipeline:
 
     def _build_provider(self, settings: Settings) -> TranslationProvider:
         if settings.translation_mode == "mock":
-            return MockTranslationProvider()
+            return MockTranslationProvider(
+                delay_seconds=settings.mock_translation_delay_seconds
+            )
 
         if settings.translation_mode == "gemini":
             return GeminiTranslationProvider(settings=settings)
@@ -283,4 +285,3 @@ class TranslationPipeline:
         if partial and partial != final_text:
             return f"{partial}..."
         return final_text
-
