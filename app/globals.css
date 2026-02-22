@@ -354,6 +354,10 @@ body {
   color: var(--text-muted);
 }
 
+.errorText {
+  color: var(--danger);
+}
+
 .emptyState {
   color: var(--text-muted);
   margin: 0.4rem 0;

@@ -112,8 +112,13 @@ class Settings:
     image_classifier_model_path: str
     image_classifier_min_confidence: float
     image_classifier_min_votes: int
+    image_classifier_min_vote_ratio: float
+    image_classifier_min_margin: float
     image_classifier_label_allowlist: str | None
     image_classifier_input_size: int
+    elevenlabs_api_key: str | None
+    elevenlabs_voice_id: str
+    elevenlabs_model_id: str
     gemini_model: str
     gemini_api_base_url: str
     gemini_api_key: str | None
@@ -194,10 +199,15 @@ class Settings:
             "image_classifier_model_path": self.image_classifier_model_path,
             "image_classifier_min_confidence": self.image_classifier_min_confidence,
             "image_classifier_min_votes": self.image_classifier_min_votes,
+            "image_classifier_min_vote_ratio": self.image_classifier_min_vote_ratio,
+            "image_classifier_min_margin": self.image_classifier_min_margin,
             "image_classifier_label_allowlist": bool(
                 (self.image_classifier_label_allowlist or "").strip()
             ),
             "image_classifier_input_size": self.image_classifier_input_size,
+            "elevenlabs_api_key_configured": bool(self.elevenlabs_api_key),
+            "elevenlabs_voice_id": self.elevenlabs_voice_id,
+            "elevenlabs_model_id": self.elevenlabs_model_id,
             "gemini_model": self.gemini_model,
             "gemini_api_base_url": self.gemini_api_base_url,
             "gemini_key_configured": self.gemini_key_configured,
@@ -314,8 +324,17 @@ def build_settings(project_root: Path) -> Settings:
             os.getenv("IMAGE_CLASSIFIER_MIN_CONFIDENCE", "0.58")
         ),
         image_classifier_min_votes=int(os.getenv("IMAGE_CLASSIFIER_MIN_VOTES", "2")),
+        image_classifier_min_vote_ratio=float(
+            os.getenv("IMAGE_CLASSIFIER_MIN_VOTE_RATIO", "0.5")
+        ),
+        image_classifier_min_margin=float(
+            os.getenv("IMAGE_CLASSIFIER_MIN_MARGIN", "0.14")
+        ),
         image_classifier_label_allowlist=os.getenv("IMAGE_CLASSIFIER_LABEL_ALLOWLIST"),
         image_classifier_input_size=int(os.getenv("IMAGE_CLASSIFIER_INPUT_SIZE", "32")),
+        elevenlabs_api_key=os.getenv("ELEVENLABS_API_KEY"),
+        elevenlabs_voice_id=os.getenv("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM"),
+        elevenlabs_model_id=os.getenv("ELEVENLABS_MODEL_ID", "eleven_turbo_v2_5"),
         gemini_model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
         gemini_api_base_url=os.getenv(
             "GEMINI_API_BASE_URL",

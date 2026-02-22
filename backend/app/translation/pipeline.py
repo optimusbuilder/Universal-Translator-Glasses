@@ -381,6 +381,8 @@ class TranslationPipeline:
 
     def _normalize_translation(self, payload: TranslationPayload) -> tuple[str, float, bool]:
         text = (payload.text or "").strip()
+        if self._settings.translation_mode in {"local_classifier", "image_classifier"}:
+            text = text.replace("_", " ")
         text = text.replace("`", "").replace('"', "").strip()
         text = re.sub(r"\s+", " ", text)
         if not text:

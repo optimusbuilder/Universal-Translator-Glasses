@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import AsyncIterator
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from backend.app.ingest.manager import IngestManager
 from backend.app.landmarks.pipeline import LandmarkPipeline
@@ -113,6 +114,13 @@ def create_app() -> FastAPI:
         title=settings.service_name,
         version=settings.service_version,
         lifespan=lifespan,
+    )
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
 
     @app.get("/")

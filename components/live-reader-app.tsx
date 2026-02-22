@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useCaptionStream } from "@/hooks/use-caption-stream";
 import type { AlertEntry, CaptionEntry, FontScale, ReaderTab } from "@/lib/types";
 
@@ -37,6 +37,24 @@ const confidenceTone = (entry: CaptionEntry | null): string => {
   }
 
   return "toneHigh";
+};
+
+const resolveBackendBaseUrl = (wsUrl?: string): string => {
+  const configured = process.env.NEXT_PUBLIC_BACKEND_URL?.trim();
+  if (configured) {
+    return configured.replace(/\/$/, "");
+  }
+
+  if (wsUrl) {
+    const fromWs = wsUrl.replace(/^ws:/i, "http:").replace(/^wss:/i, "https:");
+    return fromWs.replace(/\/ws\/events\/?$/i, "");
+  }
+
+  if (typeof window === "undefined") {
+    return "http://127.0.0.1:8000";
+  }
+
+  return `${window.location.protocol}//${window.location.hostname}:8000`;
 };
 
 type TranscriptPanelProps = {
@@ -174,6 +192,12 @@ export const LiveReaderApp = () => {
   const [activeTab, setActiveTab] = useState<ReaderTab>("live");
   const [fontScale, setFontScale] = useState<FontScale>("large");
   const [presenterMode, setPresenterMode] = useState(false);
+  const [audioLoading, setAudioLoading] = useState(false);
+  const [audioError, setAudioError] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioUrlRef = useRef<string | null>(null);
+
+  const backendBaseUrl = useMemo(() => resolveBackendBaseUrl(wsUrl), [wsUrl]);
 
   const liveStatusMessage = useMemo(() => {
     if (!sessionActive) {
@@ -195,6 +219,69 @@ export const LiveReaderApp = () => {
     const confirmed = window.confirm("Clear transcript and current captions?");
     if (confirmed) {
       clearTranscript();
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      if (audioUrlRef.current) {
+        URL.revokeObjectURL(audioUrlRef.current);
+        audioUrlRef.current = null;
+      }
+    };
+  }, []);
+
+  const listenToCaption = async () => {
+    const text = currentCaption?.text?.trim() ?? "";
+    if (!text || text.toLowerCase() === "[unclear]") {
+      return;
+    }
+
+    setAudioLoading(true);
+    setAudioError(null);
+
+    try {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      if (audioUrlRef.current) {
+        URL.revokeObjectURL(audioUrlRef.current);
+        audioUrlRef.current = null;
+      }
+
+      const response = await fetch(`${backendBaseUrl}/translations/tts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text })
+      });
+
+      if (!response.ok) {
+        const detail = await response.text();
+        throw new Error(detail || `TTS failed (${response.status})`);
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      audioUrlRef.current = url;
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      audio.onended = () => {
+        URL.revokeObjectURL(url);
+        if (audioUrlRef.current === url) {
+          audioUrlRef.current = null;
+        }
+      };
+      await audio.play();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Audio playback failed.";
+      setAudioError(message);
+    } finally {
+      setAudioLoading(false);
     }
   };
 
@@ -222,6 +309,13 @@ export const LiveReaderApp = () => {
           </button>
           <button className="btn btnDanger" onClick={clearWithConfirm}>
             Clear
+          </button>
+          <button
+            className="btn"
+            onClick={listenToCaption}
+            disabled={audioLoading || !currentCaption || currentCaption.text.trim().toLowerCase() === "[unclear]"}
+          >
+            {audioLoading ? "Generating Audio..." : "Listen"}
           </button>
 
           <label className="toggleWrap">
@@ -271,6 +365,7 @@ export const LiveReaderApp = () => {
               </span>
               <span className="monoLabel">Queue {metrics.queue_depth}</span>
               <span className="monoLabel">Hands {metrics.hands_detected ? "Detected" : "Not detected"}</span>
+              {audioError ? <span className="monoLabel errorText">Audio: {audioError}</span> : null}
             </div>
           </div>
         </section>

@@ -43,18 +43,38 @@ class ImageClassifierTranslationProvider(TranslationProvider):
         label_scores: dict[str, float] = defaultdict(float)
         label_votes: dict[str, int] = defaultdict(int)
         total_weight = 0.0
+        considered_frames = 0
+        dominant_side = self._dominant_handedness(window)
 
         for frame in window.frames:
             if not frame.hands or not frame.frame_payload:
                 continue
 
-            best_hand = max(frame.hands, key=lambda item: item.confidence)
+            eligible_hands = [
+                hand
+                for hand in frame.hands
+                if hand.confidence >= self._settings.translation_hand_confidence_threshold
+            ]
+            if not eligible_hands:
+                continue
+
+            if dominant_side:
+                side_matched = [
+                    hand for hand in eligible_hands if hand.handedness.lower() == dominant_side
+                ]
+                if side_matched:
+                    eligible_hands = side_matched
+
+            best_hand = max(eligible_hands, key=lambda item: item.confidence)
             if best_hand.confidence < self._settings.translation_hand_confidence_threshold:
                 continue
 
             image_crop = self._crop_hand_region(frame.frame_payload, best_hand.landmarks)
             if image_crop is None:
                 continue
+
+            if best_hand.handedness.lower() == "left":
+                image_crop = np.ascontiguousarray(image_crop[:, ::-1, :])
 
             feature = preprocess_image_array(
                 image_crop,
@@ -74,6 +94,7 @@ class ImageClassifierTranslationProvider(TranslationProvider):
             label_scores[label] += vote_weight
             label_votes[label] += 1
             total_weight += vote_weight
+            considered_frames += 1
 
         if not label_scores:
             return TranslationPayload(text="UNCLEAR", confidence=0.2)
@@ -83,11 +104,41 @@ class ImageClassifierTranslationProvider(TranslationProvider):
         if best_votes < max(1, self._settings.image_classifier_min_votes):
             return TranslationPayload(text="UNCLEAR", confidence=0.3)
 
+        if considered_frames <= 0:
+            return TranslationPayload(text="UNCLEAR", confidence=0.2)
+
+        vote_ratio = best_votes / float(max(1, considered_frames))
+        if vote_ratio < max(0.0, min(1.0, self._settings.image_classifier_min_vote_ratio)):
+            return TranslationPayload(text="UNCLEAR", confidence=vote_ratio)
+
+        second_score = 0.0
+        for label, score in label_scores.items():
+            if label == best_label:
+                continue
+            if score > second_score:
+                second_score = score
+        normalized_margin = (best_score - second_score) / max(total_weight, 1e-6)
+        if normalized_margin < max(0.0, self._settings.image_classifier_min_margin):
+            return TranslationPayload(text="UNCLEAR", confidence=max(0.2, normalized_margin))
+
         confidence = best_score / max(total_weight, 1e-6)
         if confidence < self._settings.image_classifier_min_confidence:
             return TranslationPayload(text="UNCLEAR", confidence=confidence)
 
         return TranslationPayload(text=best_label, confidence=confidence)
+
+    def _dominant_handedness(self, window: LandmarkWindow) -> str | None:
+        counts: dict[str, int] = defaultdict(int)
+        for frame in window.frames:
+            for hand in frame.hands:
+                if hand.confidence < self._settings.translation_hand_confidence_threshold:
+                    continue
+                side = hand.handedness.lower()
+                if side in {"left", "right"}:
+                    counts[side] += 1
+        if not counts:
+            return None
+        return max(counts.items(), key=lambda item: item[1])[0]
 
     def _crop_hand_region(
         self,
@@ -125,7 +176,7 @@ class ImageClassifierTranslationProvider(TranslationProvider):
         span_x = max(1e-3, max_x - min_x)
         span_y = max(1e-3, max_y - min_y)
 
-        padding = 0.35
+        padding = 0.5
         x0 = int(max(0, (min_x - (span_x * padding)) * width))
         x1 = int(min(width, (max_x + (span_x * padding)) * width))
         y0 = int(max(0, (min_y - (span_y * padding)) * height))

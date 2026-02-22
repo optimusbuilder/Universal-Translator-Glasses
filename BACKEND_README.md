@@ -409,6 +409,32 @@ To use it, set:
 4. `IMAGE_CLASSIFIER_MIN_VOTES=2`
 5. `IMAGE_CLASSIFIER_INPUT_SIZE=64`
 
+Live calibration capture (recommended for higher real-world accuracy):
+
+```bash
+.venv/bin/python -m backend.tools.collect_live_sign_samples \
+  --label A \
+  --source 1 \
+  --duration-seconds 20 \
+  --frame-stride 2 \
+  --output-dir backend/data/live_calibration
+```
+
+Phrase-by-phrase collection mode (guided, 7 repetitions per phrase, confirmation each save):
+
+```bash
+.venv/bin/python -m backend.tools.collect_live_sign_samples \
+  --phrases "I LOVE YOU,THANK YOU,HELLO,SORRY,GOOD MORNING,NO,HI,HOW ARE YOU" \
+  --repetitions 7 \
+  --source 1 \
+  --capture-seconds 2.4 \
+  --countdown-seconds 1.0 \
+  --output-dir backend/data/live_calibration
+```
+
+For a longer list, use `--phrases-file` (one phrase per line).  
+After capture, retrain using `backend/data/live_calibration` (or merge it with your main dataset).
+
 ## 8) Current Status
 
 Current state:
